@@ -1,0 +1,13 @@
+.env
+.venv
+venv
+*.db
+.git
+__pycache__
+.pytest_cache
+.ruff_cache
+tests
+reference
+*.mp3
+*.wav
+.DS_Store
