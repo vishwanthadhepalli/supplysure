@@ -1,0 +1,17 @@
+{
+  "steps": [
+    {"id": "knit", "machines": 12, "rate_per_machine_day": 350},
+    {"id": "link", "machines": 6, "rate_per_machine_day": 800},
+    {"id": "board", "machines": 2, "rate_per_machine_day": 2500},
+    {"id": "pair", "machines": 30, "rate_per_machine_day": 200},
+    {"id": "pack", "machines": 13, "rate_per_machine_day": 500}
+  ],
+  "dye_slots": ["2027-06-28", "2027-07-07", "2027-07-16", "2027-07-25"],
+  "dye_days": 5,
+  "second_shift_multiplier": 1.5,
+  "dispatch_days": 2,
+  "transit_days": 35,
+  "planned_downtime": [
+    {"step": "knit", "from": "2027-07-15", "to": "2027-07-25", "machines_down": 2}
+  ]
+}

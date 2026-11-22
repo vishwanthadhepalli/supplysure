@@ -1,0 +1,608 @@
+<title>Supply Visibility Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+  /* Layout concept: a work app for a factory owner. Sidebar for five areas, one working screen,
+     and an Ask panel that docks beside it. Indigo marks actions and sources; red, amber and green mean only "how late". */
+  :root {
+    --bg: #eef1f6; --surface: #ffffff; --ink: #161c2e; --muted: #566079; --line: #d3d9e4; --fill: #e6eaf2;
+    --accent: #27348b; --on-accent: #ffffff; --accent-soft: #e3e7fb;
+    --ok: #17694a; --ok-bg: #dff3e8; --warn: #8a5200; --warn-bg: #fdeccb; --risk: #b3261e; --risk-bg: #fbe5e2;
+    --idle: #566079; --idle-bg: #e6eaf2;
+    --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1320; --surface: #181e2f; --ink: #e8ebf4; --muted: #9aa4bd; --line: #2e3650; --fill: #222a40;
+      --accent: #9db0ff; --on-accent: #0f1630; --accent-soft: #232d57;
+      --ok: #6fd0a0; --ok-bg: #14302a; --warn: #f2b45a; --warn-bg: #34270f; --risk: #ff9c90; --risk-bg: #3b1f1d;
+      --idle: #9aa4bd; --idle-bg: #222a40; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1320; --surface: #181e2f; --ink: #e8ebf4; --muted: #9aa4bd; --line: #2e3650; --fill: #222a40;
+    --accent: #9db0ff; --on-accent: #0f1630; --accent-soft: #232d57;
+    --ok: #6fd0a0; --ok-bg: #14302a; --warn: #f2b45a; --warn-bg: #34270f; --risk: #ff9c90; --risk-bg: #3b1f1d;
+    --idle: #9aa4bd; --idle-bg: #222a40; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.45; margin: 0;
+    padding-block: 18px 30px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 1340px; margin: 0 auto; }
+  h1, h2, h3, h4 { font-family: var(--display); margin: 0; letter-spacing: -0.01em; }
+  h1 { font-size: 20px; } h2 { font-size: 16px; } h3 { font-size: 14px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+
+  .shell { display: grid; grid-template-columns: 196px minmax(0, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; height: min(900px, calc(100vh - 36px)); min-height: 640px; }
+  .side { border-right: 1px solid var(--line); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; background: color-mix(in srgb, var(--fill) 55%, var(--surface)); }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px 14px; font-family: var(--display); font-weight: 700; }
+  .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); flex: none; position: relative; }
+  .mark::after { content: ""; position: absolute; left: 7px; top: 7px; width: 12px; height: 12px; border: 2px solid var(--on-accent); border-radius: 50%; }
+  .navbtn { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-weight: 500; cursor: pointer; position: relative; }
+  .navbtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .navbtn[aria-current="page"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+  .badge { margin-left: auto; font-size: 11px; font-weight: 700; border-radius: 999px; padding: 1px 7px; background: var(--warn-bg); color: var(--warn); }
+  .badge.risk { background: var(--risk-bg); color: var(--risk); }
+  .side-foot { margin-top: auto; padding: 8px; color: var(--muted); font-size: 12px; }
+  .linkbtn { background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 0; font-size: 12px; }
+  .mainwrap { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .bar h1 { margin-right: auto; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; flex: none; }
+  main { flex: 1; overflow-y: auto; padding: 16px; min-height: 0; }
+
+  .agent { position: fixed; top: 0; right: 0; bottom: 0; width: min(390px, 100%); z-index: 60; background: var(--surface); border-left: 1px solid var(--line); display: flex; flex-direction: column; min-height: 0;
+    transform: translateX(105%); transition: transform 0.2s ease; padding-top: env(safe-area-inset-top, 0px); padding-bottom: env(safe-area-inset-bottom, 0px); padding-right: env(safe-area-inset-right, 0px); }
+  .agent.open { transform: none; box-shadow: -12px 0 30px rgba(0, 0, 0, 0.18); }
+  .agent-head { display: flex; align-items: center; gap: 8px; padding: 12px 14px; border-bottom: 1px solid var(--line); }
+  .agent-head h2 { margin-right: auto; }
+  .chat { flex: 1; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; min-height: 0; }
+  .msg { max-width: 94%; padding: 9px 11px; border-radius: 10px; background: var(--fill); }
+  .msg.user { align-self: flex-end; background: var(--accent); color: var(--on-accent); }
+  .msg ul { margin: 6px 0 0; padding-left: 18px; }
+  .draft, .opt { border: 1px solid var(--accent); border-radius: 10px; padding: 10px; background: var(--surface); }
+  .draft .lab { font-size: 12px; font-weight: 700; color: var(--muted); margin-bottom: 4px; }
+  .draft q { display: block; font-style: italic; quotes: none; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; padding: 0 12px 8px; }
+  .ask { display: flex; gap: 8px; padding: 10px 12px; border-top: 1px solid var(--line); }
+  .ask input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 8px 10px; }
+  .agent-btn, .close { display: inline-flex; }
+  @media (min-width: 1101px) {
+    .shell.docked { grid-template-columns: 196px minmax(0, 1fr) 350px; }
+    .shell.docked .agent { position: static; transform: none; width: auto; box-shadow: none; padding: 0; z-index: auto; }
+    .shell.docked .agent-btn, .shell.docked .close { display: none; }
+  }
+  .scrim { position: fixed; inset: 0; background: rgba(10, 14, 28, 0.4); z-index: 55; }
+
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .btn.small { padding: 4px 10px; font-size: 12px; }
+  .btn[disabled] { opacity: 0.65; cursor: default; }
+  .btn:focus-visible, .navbtn:focus-visible, .node:focus-visible, .tab:focus-visible, input:focus-visible, .row-link:focus-visible, .linkbtn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .chip.risk { background: var(--risk-bg); color: var(--risk); } .chip.idle { background: var(--idle-bg); color: var(--idle); }
+  .chip.acc { background: var(--accent-soft); color: var(--accent); }
+  .card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px; min-width: 0; }
+  .stack-v { display: flex; flex-direction: column; gap: 12px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 10px; }
+  .stat small { display: block; color: var(--muted); font-weight: 500; }
+  .stat strong { display: block; font-family: var(--display); font-size: 20px; margin: 2px 0; }
+  .stat .sub { color: var(--muted); font-size: 12px; }
+  .att { border-left: 6px solid var(--idle); }
+  .att.risk { border-left-color: var(--risk); } .att.warn { border-left-color: var(--warn); } .att.ok { border-left-color: var(--ok); }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .sect { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin: 4px 0 -4px; }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .r { text-align: right; }
+  .tablewrap { overflow-x: auto; } .tablewrap table { min-width: 640px; }
+  .row-link { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 4px 12px; align-items: center; }
+  .row-link[disabled] { cursor: default; opacity: 0.85; }
+
+  .crumbs { display: flex; gap: 6px; align-items: center; color: var(--muted); margin-bottom: 10px; }
+  .crumbs button { background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 0; }
+  .controls { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .slider { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; }
+  input[type="range"] { width: 160px; max-width: 100%; accent-color: var(--accent); }
+  .advice { flex-basis: 100%; padding: 8px 10px; border-radius: 8px; background: var(--fill); }
+  .tabs { display: flex; gap: 6px; }
+  .tab { background: transparent; border: 1px solid transparent; border-radius: 8px; padding: 6px 12px; font-weight: 600; color: var(--muted); cursor: pointer; }
+  .tab[aria-selected="true"] { background: var(--surface); color: var(--ink); border-color: var(--line); }
+  .gwrap { overflow-x: auto; }
+  .graph { position: relative; display: flex; gap: 20px; padding: 14px 14px 18px; min-width: max-content; }
+  .edges { position: absolute; left: 0; top: 0; pointer-events: none; z-index: 0; overflow: visible; }
+  .edges path { fill: none; stroke-width: 2; stroke: var(--line); } .edges path.warn { stroke: var(--warn); } .edges path.risk { stroke: var(--risk); } .edges path.inf { stroke-dasharray: 4 3; }
+  .col { display: flex; flex-direction: column; width: 126px; position: relative; z-index: 1; }
+  .col-title { font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); margin-bottom: 8px; height: 16px; }
+  .stackn { flex: 1; display: flex; flex-direction: column; justify-content: center; gap: 12px; }
+  .node { display: block; width: 100%; text-align: left; cursor: pointer; background: var(--surface); border: 1px solid var(--line); border-left: 5px solid var(--idle); border-radius: 10px; padding: 7px 8px; min-width: 0; }
+  .node.inferred { border-style: dashed; border-left-style: solid; }
+  .node.ok { border-left-color: var(--ok); } .node.warn { border-left-color: var(--warn); }
+  .node.risk { border-left-color: var(--risk); background: color-mix(in srgb, var(--risk-bg) 55%, var(--surface)); }
+  .node[aria-pressed="true"] { box-shadow: 0 0 0 2px var(--accent); }
+  .node b { display: block; font-size: 12.5px; } .node .s { display: block; color: var(--muted); font-size: 11.5px; margin-bottom: 3px; }
+  .node .l { display: block; font-size: 11.5px; } .node .chip { margin-bottom: 4px; font-size: 11px; }
+  .node .src { display: block; font-size: 11px; color: var(--accent); font-weight: 600; margin-bottom: 3px; }
+  .legend { padding: 8px 14px; border-top: 1px solid var(--line); color: var(--muted); font-size: 12px; }
+  .detail { border-top: 1px solid var(--line); padding: 14px; display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 16px; }
+  .detail ul, .ev { margin: 6px 0 0; padding-left: 18px; } .detail li, .ev li { margin-bottom: 3px; }
+  .kv { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; margin-top: 8px; }
+  .kv div { background: var(--fill); border-radius: 8px; padding: 6px 9px; } .kv small { display: block; color: var(--muted); }
+
+  .item h3 { margin-right: auto; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 8px; margin-top: 10px; }
+  .fields div { background: var(--fill); border-radius: 8px; padding: 6px 9px; } .fields small { display: block; color: var(--muted); }
+  .quote { margin: 8px 0 0; padding: 8px 10px; border-left: 3px solid var(--line); color: var(--muted); font-style: italic; }
+  .steps { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px; }
+  .wave { display: inline-flex; gap: 3px; align-items: center; height: 22px; }
+  .wave i { width: 3px; background: var(--accent); border-radius: 2px; height: 8px; animation: wv 0.9s ease-in-out infinite; }
+  .wave i:nth-child(2n) { animation-delay: 0.15s; } .wave i:nth-child(3n) { animation-delay: 0.3s; } .wave i:nth-child(5n) { height: 14px; }
+  @keyframes wv { 50% { height: 20px; } }
+  .pulse { animation: pulse 1s ease-in-out infinite; } @keyframes pulse { 50% { opacity: 0.5; } }
+  .ladder { list-style: none; margin: 8px 0 0; padding: 0; display: flex; gap: 6px; flex-wrap: wrap; }
+  .ladder li { font-size: 12px; padding: 3px 9px; border-radius: 999px; background: var(--fill); color: var(--muted); }
+  .ladder li.done { background: var(--ok-bg); color: var(--ok); } .ladder li.next { background: var(--accent-soft); color: var(--accent); font-weight: 600; }
+
+  .sgrid { display: grid; grid-template-columns: repeat(auto-fit, minmax(280px, 1fr)); gap: 12px; }
+  .bars { display: flex; align-items: flex-end; gap: 6px; height: 64px; margin: 18px 0 4px; }
+  .bars span { flex: 1; background: var(--accent-soft); border-radius: 4px 4px 0 0; position: relative; min-height: 3px; }
+  .bars span.hi { background: var(--risk-bg); }
+  .bars i { position: absolute; top: -16px; left: 0; right: 0; text-align: center; font-style: normal; font-size: 11px; color: var(--muted); }
+
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 80; background: var(--ink); color: var(--bg); padding: 9px 14px; border-radius: 10px; max-width: calc(100% - 32px); }
+  .bottomnav { display: none; }
+  @media (max-width: 1100px) { }
+  @media (max-width: 760px) {
+    body { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+    .shell { display: block; height: auto; min-height: 0; border: 0; background: transparent; border-radius: 0; overflow: visible; }
+    .side { display: none; }
+    .bar { padding: 4px 0 10px; border-bottom: 0; }
+    main { overflow: visible; padding: 0; }
+    .detail { grid-template-columns: minmax(0, 1fr); }
+    .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+    .bottomnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--surface); border-top: 1px solid var(--line);
+      padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+    .bottomnav .navbtn { flex-direction: column; gap: 2px; font-size: 11px; text-align: center; padding: 6px 2px; }
+    .bottomnav .badge { position: absolute; top: 0; right: 14%; margin: 0; }
+    .row-link { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <div class="shell" id="shell">
+    <aside class="side" aria-label="Main navigation">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>Order Map</div>
+      <div id="nav-side"></div>
+      <div class="side-foot">Kovai Knits<br>Sample data. Nothing is sent.<br><button class="linkbtn" data-act="reset-all" type="button">Reset the demo</button></div>
+    </aside>
+    <div class="mainwrap">
+      <header class="bar"><h1 id="title">Today</h1><button class="btn agent-btn" type="button" data-act="agent-open">Ask</button><span class="avatar" aria-label="Meena">M</span></header>
+      <main id="main"></main>
+    </div>
+    <aside class="agent" id="agent" aria-label="Ask the agent">
+      <div class="agent-head"><h2>Ask</h2><span class="chip acc">Asks before sending</span><button class="btn small close" type="button" data-act="agent-close">Close</button></div>
+      <div class="chat" id="chat" aria-live="polite"></div>
+      <div class="chips" id="chips"></div>
+      <form class="ask" id="askform"><label for="q" style="position:absolute;left:-9999px">Ask about your orders</label><input id="q" type="text" placeholder="Ask about delays, shortages, suppliers" autocomplete="off"><button class="btn primary" type="submit">Ask</button></form>
+    </aside>
+  </div>
+  <nav class="bottomnav" id="nav-bottom" aria-label="Main navigation"></nav>
+</div>
+<div class="scrim" id="scrim" hidden></div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  var D = function (m, d) { return Math.round(Date.UTC(2027, m - 1, d) / 864e5); };
+  var MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var fmt = function (n) { var t = new Date(n * 864e5); return MN[t.getUTCMonth()] + " " + t.getUTCDate(); };
+  var sl = function (n) { return (n > 0 ? "+" : "") + n + " d"; };
+  var plural = function (n) { return n + (Math.abs(n) === 1 ? " day" : " days"); };
+  var lakh = function (n) { return n === 0 ? "₹0" : "₹" + (n / 100000).toFixed(1) + " lakh"; };
+  var f0 = function (x) { return Math.round(x).toLocaleString("en-IN"); };
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+
+  var SLOTS = [D(6,28), D(7,7), D(7,16), D(7,25)];
+  var PAIRS = 50000, PER_DAY = 4200, SHIP_BY = D(7,20), ARRIVE_BY = D(8,24), COST_PER_DAY = 20000;
+
+  var NODES = [
+    { id:"cotton", col:0, name:"Cotton trader", sub:"Erode · Tier 2", base:"On track", inferred:true },
+    { id:"elast", col:0, name:"Elastane maker", sub:"Overseas · Tier 2", base:"Done" },
+    { id:"yarn", col:1, name:"Ravi Spinning", sub:"Yarn, 4,000 kg", base:"On track" },
+    { id:"trader", col:1, name:"Chennai trader", sub:"Elastane, 150 kg", base:"On track" },
+    { id:"sri", col:1, name:"Sri Print", sub:"Labels, cartons", base:"Silent" },
+    { id:"dye", col:2, name:"Dye house", sub:"Fixed batch days", base:"Waiting" },
+    { id:"knit", col:3, name:"Your knitting", sub:"12 machines", base:"Waiting" },
+    { id:"pack", col:4, name:"Finish, pack", sub:"Your unit", base:"Waiting" },
+    { id:"dispatch", col:5, name:"Truck, vessel", sub:"Booked Jul 20", base:"Waiting" },
+    { id:"customer", col:6, name:"US warehouse", sub:"Then payment", base:"Waiting" }
+  ];
+  var COLS = ["Tier 2","Tier 1","Dyeing","Knitting","Finish, pack","Dispatch","Customer"];
+  var EDGES = [["cotton","yarn"],["elast","trader"],["yarn","dye"],["trader","knit"],["dye","knit"],["knit","pack"],["sri","pack"],["pack","dispatch"],["dispatch","customer"]];
+  var SUPPLIERS = [
+    { n:"Ravi Spinning", what:"Cotton yarn", slip:6, hist:[5,7,6,4,8,6], ch:"Voice notes in Tamil", note:"Dates he gives by voice note run about 6 days early. Dates in emails run about 2 days early. Any mention of bales or power cuts means a longer slip." },
+    { n:"Chennai trader", what:"Elastane", slip:0, hist:[0,1,0,0,1,0], ch:"Email", note:"Reliable. Confirms by email and delivers on the date given." },
+    { n:"Sri Print", what:"Labels, cartons", slip:2, hist:[2,3,1,4,2,3], ch:"Phone call", note:"Often silent. Needs a nudge two days before the due date. Replies to calls faster than to messages." }
+  ];
+
+  var state = { view:"today", ptab:"map", delay:0, shift:false, sel:"yarn", voice:"idle", inboxTab:"received", sent:{}, replied:{}, agentOpen:false, chat:[] };
+
+  /* ---------- engine ---------- */
+  function compute(delay, shift) {
+    var kdur = Math.ceil(PAIRS / (PER_DAY * (shift ? 1.5 : 1)));
+    var dur = { yarn:7, trader:9, dye:5, knit:kdur, pack:4, dispatch:2 };
+    var EF = {}, ES = {}, LF = {};
+    EF.cotton = D(6,18) + delay; EF.elast = D(6,12); EF.sri = D(6,30);
+    EF.yarn = EF.cotton + dur.yarn; EF.trader = EF.elast + dur.trader;
+    var avail = EF.yarn + 1, ds = avail;
+    for (var i = 0; i < SLOTS.length; i++) { if (SLOTS[i] >= avail) { ds = SLOTS[i]; break; } }
+    ES.dye = ds; EF.dye = ds + dur.dye - 1;
+    ES.knit = Math.max(EF.dye, EF.trader) + 1; EF.knit = ES.knit + dur.knit - 1;
+    ES.pack = Math.max(EF.knit, EF.sri) + 1; EF.pack = ES.pack + dur.pack - 1;
+    ES.dispatch = EF.pack + 1; EF.dispatch = ES.dispatch + dur.dispatch - 1;
+    EF.customer = EF.dispatch + 35;
+    var LS = function (id) { return LF[id] - dur[id] + 1; };
+    LF.customer = ARRIVE_BY; LF.dispatch = LF.customer - 35;
+    LF.pack = LS("dispatch") - 1; LF.sri = LS("pack") - 1; LF.knit = LS("pack") - 1;
+    LF.dye = LS("knit") - 1; LF.trader = LS("knit") - 1;
+    LF.yarn = LS("dye") - 1; LF.elast = LS("trader") - 1; LF.cotton = LS("yarn") - 1;
+    var slack = {}; for (var k in EF) slack[k] = LF[k] - EF[k];
+    return { EF:EF, ES:ES, LF:LF, slack:slack, kdur:kdur, dur:dur, slotLost: ds > SLOTS[0], perDay: PER_DAY * (shift ? 1.5 : 1) };
+  }
+  function cur() { return compute(state.delay, state.shift); }
+  function baseC() { return compute(0, false); }
+  function lateDays(c) { return Math.max(0, c.EF.dispatch - SHIP_BY); }
+  function statusOf(n, c, base) {
+    if (n.base === "Done") return { t:"Done", c:"ok" };
+    if (c.slack[n.id] < 0) return { t:"Late", c:"risk" };
+    if (c.EF[n.id] > base.EF[n.id]) return { t:"At risk", c:"warn" };
+    if (n.base === "Silent") return { t:"Silent", c:"warn" };
+    if (n.base === "On track") return { t:"On track", c:"ok" };
+    return { t:"Waiting", c:"idle" };
+  }
+
+  function shortages(c) {
+    var yMargin = SLOTS[0] - (c.EF.yarn + 1);
+    var items = [
+      { n:"Cotton yarn", u:"kg", need:4950, hand:1200, inc:4000, v:"Ravi Spinning", needBy:SLOTS[0], exp:c.EF.yarn, margin:yMargin, kind:"yarn" },
+      { n:"Elastane", u:"kg", need:165, hand:40, inc:150, v:"Chennai trader", needBy:c.ES.knit, exp:c.EF.trader, margin:c.ES.knit - c.EF.trader },
+      { n:"Labels", u:"pcs", need:51000, hand:8000, inc:45000, v:"Sri Print", needBy:c.ES.pack, exp:c.EF.sri, margin:c.ES.pack - c.EF.sri, silent:true },
+      { n:"Cartons", u:"pcs", need:4250, hand:500, inc:3750, v:"Sri Print", needBy:c.ES.pack, exp:c.EF.sri, margin:c.ES.pack - c.EF.sri, silent:true }
+    ];
+    items.forEach(function (i) {
+      i.spare = i.hand + i.inc - i.need; i.pct = i.spare / i.need; var why = [];
+      if (i.kind === "yarn" && i.margin < 0) { i.st = { t:"Will run short", c:"risk" }; why.push("Arrives after the " + fmt(SLOTS[0]) + " dye batch. Next batch " + fmt(c.ES.dye) + "."); }
+      else {
+        if (i.margin <= 2) why.push(plural(i.margin) + " of margin before it is needed.");
+        if (i.pct < 0.05) why.push(i.spare <= 0 ? "No spare stock at all." : "Spare is only " + Math.round(i.pct * 100) + "%, which waste could use up.");
+        if (i.silent) why.push("Sri Print has been silent for 6 days.");
+        if (i.kind === "yarn") why.push("Ravi usually runs about 6 days late.");
+        i.st = why.length ? { t:"Thin", c:"warn" } : { t:"Covered", c:"ok" };
+        if (!why.length) why.push(plural(i.margin) + " of margin, " + Math.round(i.pct * 100) + "% spare.");
+      }
+      i.why = why;
+    });
+    return items;
+  }
+  function followups() {
+    var out = [];
+    var sriLadder = [{ t:"Message Jun 8", d:1 }, { t:"Follow-up Jun 10", d:1 }];
+    if (state.sent.sri) sriLadder.push({ t:"Reminder today 10:30", d:1 });
+    sriLadder.push({ t:"Call tomorrow 10:00", n:1 }, { t:"Alert you Jun 16" });
+    out.push({ who:"Sri Print", what:"Labels and cartons, PO 4480", chip:state.sent.sri ? { t:"Reminder sent", c:"acc" } : { t:"Silent 6 days", c:"warn" }, ladder:sriLadder, act: state.sent.sri ? "" : '<button class="btn small primary" data-act="ask" data-q="Draft a follow-up to Sri Print">Draft a reminder</button><button class="btn small" data-act="toast" data-m="Snoozed for one day (sample).">Snooze a day</button>' });
+    if (state.voice === "done") {
+      if (state.replied.ravi) out.unshift({ who:"Ravi Spinning", what:"Proof of the cotton bales", chip:{ t:"Replied", c:"ok" }, ladder:[{ t:"Message today 10:20", d:1 }, { t:"Reply 11:05: photo, bales arrive Jun 22", d:1 }], act:"", note:"Confidence in the new date is now 92%." });
+      else if (state.sent.ravi) out.unshift({ who:"Ravi Spinning", what:"Proof of the cotton bales", chip:{ t:"Waiting for a reply", c:"acc" }, ladder:[{ t:"Message today 10:20", d:1 }, { t:"Follow-up tomorrow 10:20", n:1 }, { t:"Call the day after" }, { t:"Alert you" }], act:'<button class="btn small" data-act="reply-ravi">Play Ravi\'s reply</button>' });
+      else out.unshift({ who:"Ravi Spinning", what:"Proof of the cotton bales", chip:{ t:"Waiting for your approval", c:"warn" }, ladder:[{ t:"Draft ready", n:1 }, { t:"Follow-up tomorrow" }, { t:"Call the day after" }, { t:"Alert you" }], act:'<button class="btn small primary" data-act="send" data-k="ravi">Approve and send</button>' });
+    }
+    out.push({ who:"Chennai trader", what:"Elastane delivery, PO 4475", chip:{ t:"Replied", c:"ok" }, ladder:[{ t:"Message Jun 12", d:1 }, { t:"Reply: delivers Jun 21", d:1 }], act:"" });
+    return out;
+  }
+
+  /* ---------- icons and nav ---------- */
+  var ICONS = {
+    today: '<path d="M4 6h16M4 12h16M4 18h10"/>',
+    orders: '<circle cx="5" cy="6" r="2"/><circle cx="5" cy="18" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 6h3a4 4 0 0 1 4 4v0M7 18h3a4 4 0 0 0 4-4v0M14 12h3"/>',
+    inbox: '<path d="M4 13l2-7h12l2 7v5H4z"/><path d="M4 13h5l1 2h4l1-2h5"/>',
+    shortages: '<path d="M4 8l8-4 8 4-8 4z"/><path d="M4 8v8l8 4 8-4V8"/>',
+    suppliers: '<path d="M4 20V9l8-5 8 5v11"/><path d="M9 20v-6h6v6"/>'
+  };
+  var NAV = [["today","Today"],["orders","Orders"],["inbox","Inbox"],["shortages","Shortages"],["suppliers","Suppliers"]];
+  function navHtml() {
+    var cv = state.view === "order" ? "orders" : state.view, sh = shortages(cur()), n = sh.filter(function (x) { return x.st.c !== "ok"; }).length;
+    return NAV.map(function (nv) {
+      var b = "";
+      if (nv[0] === "shortages" && n) b = '<span class="badge' + (sh.some(function (x) { return x.st.c === "risk"; }) ? " risk" : "") + '">' + n + "</span>";
+      if (nv[0] === "inbox") { var w = followups().filter(function (x) { return x.chip.c === "warn" || x.chip.c === "acc"; }).length; if (w) b = '<span class="badge">' + w + "</span>"; }
+      return '<button type="button" class="navbtn" data-act="go" data-v="' + nv[0] + '"' + (cv === nv[0] ? ' aria-current="page"' : "") + '><svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[nv[0]] + "</svg>" + nv[1] + b + "</button>";
+    }).join("");
+  }
+
+  /* ---------- views ---------- */
+  function viewToday() {
+    var c = cur(), late = lateDays(c), cost = late * COST_PER_DAY, sh = shortages(c);
+    var thin = sh.filter(function (x) { return x.st.c !== "ok"; }), waiting = followups().filter(function (x) { return x.chip.c === "warn" || x.chip.c === "acc"; }).length;
+    var h = '<div class="stack-v"><div><h2>Good morning, Meena</h2><p class="muted">Sample data for one factory and three orders.</p></div>';
+    h += '<div class="stats"><div class="card stat"><small>Orders at risk</small><strong>' + (late > 0 ? 1 : 0) + '</strong><span class="sub">of 2 open orders</span></div>' +
+      '<div class="card stat"><small>Cost at risk</small><strong>' + lakh(cost) + '</strong><span class="sub">' + (late > 0 ? plural(late) + " late at ₹20,000 a day" : "Nothing late today") + '</span></div>' +
+      '<div class="card stat"><small>Parts short or thin</small><strong>' + thin.length + '</strong><span class="sub">of 4 parts for SO-1182</span></div>' +
+      '<div class="card stat"><small>Waiting on replies</small><strong>' + waiting + '</strong><span class="sub">suppliers asked</span></div></div>';
+    h += '<div class="sect">Needs attention</div>';
+    if (late > 0) {
+      h += '<div class="card att risk"><div class="row"><span class="chip risk">High risk</span><h3>SO-1182 will ship ' + plural(late) + ' late</h3></div><p class="muted" style="margin-top:4px">New ship date ' + fmt(c.EF.dispatch) + ' (booked ' + fmt(SHIP_BY) + '). Cause: Ravi\'s cotton bales are late' + (c.slotLost ? ", so the dye batch is missed." : ".") + '</p><div class="actions"><button class="btn primary" data-act="open-order">Open the map</button><button class="btn" data-act="agent-open">See the plan</button></div></div>';
+    } else {
+      h += '<div class="card att warn"><div class="row"><span class="chip warn">Watch</span><h3>Yarn for SO-1182 has only 2 days of slack</h3></div><p class="muted" style="margin-top:4px">Ravi\'s dates usually run about 6 days late. A delay of 3 days or more misses the dye batch and moves the ship date by 9 days.</p><div class="actions"><button class="btn primary" data-act="open-order">Open the map</button><button class="btn" data-act="go" data-v="inbox">Check the inbox</button></div></div>';
+    }
+    var worst = sh.filter(function (x) { return x.st.c === "risk"; })[0] || sh.filter(function (x) { return x.n === "Cartons"; })[0];
+    if (worst && worst.st.c !== "ok") h += '<div class="card att ' + worst.st.c + '"><div class="row"><span class="chip ' + worst.st.c + '">' + worst.st.t + '</span><h3>' + worst.n + ' for SO-1182</h3></div><p class="muted" style="margin-top:4px">' + worst.why[0] + '</p><div class="actions"><button class="btn" data-act="go" data-v="shortages">See all shortages</button></div></div>';
+    h += '<div class="card att warn"><div class="row"><span class="chip warn">' + (state.sent.sri ? "Reminder sent" : "Silent") + '</span><h3>Labels, PO 4480, Sri Print</h3></div><p class="muted" style="margin-top:4px">' + (state.sent.sri ? "Reminder sent today. Next step: an automated call tomorrow at 10:00." : "No update for 6 days. Due " + fmt(D(6,30)) + ". Plenty of slack, but the silence is logged.") + '</p>' + (state.sent.sri ? "" : '<div class="actions"><button class="btn" data-act="ask" data-q="Draft a follow-up to Sri Print">Draft a reminder</button></div>') + '</div>';
+    h += '<div class="sect">On track</div><div class="card att ok"><div class="row"><span class="chip ok">On track</span><h3>Elastane, PO 4475</h3></div><p class="muted">Arrives Jun 21, confirmed by email.</p></div><div class="card att ok"><div class="row"><span class="chip ok">On track</span><h3>SO-1190, ankle socks for a Gulf distributor</h3></div><p class="muted">Ships Aug 12 as planned.</p></div></div>';
+    return h;
+  }
+
+  function viewOrders() {
+    var late = lateDays(cur());
+    var st = late > 0 ? '<span class="chip risk">' + plural(late) + " late</span>" : '<span class="chip warn">Watch</span>';
+    return '<div class="stack-v"><div><h2>Orders</h2><p class="muted">Only SO-1182 is built out in this prototype.</p></div>' +
+      '<button class="row-link" data-act="open-order"><div><h3>SO-1182 · US retailer</h3><span class="muted">50,000 sports socks · ship by Jul 20 · arrive by Aug 24</span></div><div>' + st + "</div></button>" +
+      '<button class="row-link" disabled><div><h3>SO-1190 · Gulf distributor</h3><span class="muted">20,000 ankle socks · ship by Aug 12</span></div><div><span class="chip ok">On track</span></div></button>' +
+      '<button class="row-link" disabled><div><h3>SO-1175 · Domestic retailer</h3><span class="muted">12,000 pairs · delivered May 29</span></div><div><span class="chip idle">Paid</span></div></button></div>';
+  }
+
+  function nodeSrc(id) {
+    var v = state.voice === "done";
+    return { cotton: v ? "Ravi's voice note" : "Inferred, 3 emails", elast:"Shipping record", yarn: v ? "Voice note, Tamil" : "Email, Jun 5", trader:"Email, today 8:10", sri:"Phone call, Jun 8" }[id] || "";
+  }
+  function graphHtml(c, base) {
+    var h = '<svg class="edges" id="edges" aria-hidden="true"></svg>';
+    COLS.forEach(function (title, ci) {
+      h += '<div class="col"><div class="col-title">' + title + '</div><div class="stackn">';
+      NODES.filter(function (n) { return n.col === ci; }).forEach(function (n) {
+        var st = statusOf(n, c, base), sk = c.slack[n.id];
+        var was = c.EF[n.id] > base.EF[n.id] ? ' <span class="muted">(was ' + fmt(base.EF[n.id]) + ")</span>" : "";
+        var fin = (n.id === "customer" ? "Arrives " : "Finish ") + fmt(c.EF[n.id]);
+        var slack = n.base === "Done" ? "" : '<span class="l num" style="font-weight:600;color:var(--' + (sk < 0 ? "risk" : sk === 0 ? "warn" : "ok") + ')">Slack ' + sl(sk) + "</span>";
+        var src = nodeSrc(n.id); src = src ? '<span class="src">' + src + "</span>" : "";
+        h += '<button type="button" class="node ' + st.c + (n.inferred ? " inferred" : "") + '" data-act="node" data-id="' + n.id + '" aria-pressed="' + (state.sel === n.id) + '"><span class="chip ' + st.c + '">' + st.t + "</span><b>" + n.name + '</b><span class="s">' + n.sub + "</span>" + src + '<span class="l num">' + fin + was + "</span>" + slack + "</button>";
+      });
+      h += "</div></div>";
+    });
+    return h;
+  }
+  function evidence(id) {
+    var v = state.voice === "done", e = {
+      cotton: ["Named in 3 of Ravi's emails (not confirmed by anyone)"].concat(v ? ["Voice note, 9:42: bales arrive Jun 22, planned Jun 18"] : []),
+      elast: ["Left the overseas factory Jun 12 (shipping record)", "Cleared by the Chennai trader"],
+      yarn: ["Order PO 4471 sent Jun 3", "Email Jun 5: ready Jun 25"].concat(v ? ["Voice note, 9:42: yarn a few days late because of the bales"] : []),
+      trader: ["Email today 8:10: delivers Jun 21", "Confirmed with a customs document"],
+      sri: ["Call Jun 8: promised to send by Jun 30", "No reply to a message Jun 8 or Jun 10"],
+      dye: ["Batch days: Jun 28, Jul 7, Jul 16, Jul 25", "Missing a batch adds 9 days"],
+      knit: ["12 machines at 350 pairs a day each", "A second shift adds 50% output (sample assumption)"],
+      pack: ["4 days for 50,000 pairs"], dispatch: ["Vessel booked for Jul 20"], customer: ["Warehouse needs the goods by Aug 24", "Payment 30 days after delivery"]
+    };
+    return e[id] || [];
+  }
+  function detailHtml(c, base) {
+    var n = NODES.filter(function (x) { return x.id === state.sel; })[0], st = statusOf(n, c, base), sk = c.slack[n.id], msg;
+    if (n.base === "Done") msg = "Already done.";
+    else if (sk > 0) msg = "Can slip " + plural(sk) + " without moving the ship date.";
+    else if (sk === 0) msg = "On the critical path: any delay here moves the ship date.";
+    else msg = "Already " + plural(-sk) + " behind what the ship date needs.";
+    var promised = (n.id === "yarn" || n.id === "cotton") ? '<div class="kv"><div><small>Promised</small><b class="num">' + fmt(base.EF[n.id]) + '</b></div><div><small>Realistic</small><b class="num">' + fmt(c.EF[n.id]) + (state.delay ? "" : " to " + fmt(base.EF[n.id] + 6)) + '</b></div><div><small>Confidence</small><b>' + (state.replied.ravi ? "92%" : state.voice === "done" ? "78%" : "70%") + "</b></div></div>" : "";
+    var act = (n.id === "yarn" || n.id === "cotton") ? '<button class="btn primary" data-act="ask" data-q="Why is yarn late?">Ask why</button>' : n.id === "sri" ? '<button class="btn primary" data-act="ask" data-q="Draft a follow-up to Sri Print">Draft a reminder</button>' : '<button class="btn" data-act="ask" data-q="What is at risk this week?">What is at risk?</button>';
+    return '<div><div class="row"><h3>' + n.name + '</h3><span class="chip ' + st.c + '">' + st.t + '</span>' + (n.inferred ? '<span class="chip idle">Inferred</span>' : "") + '</div><p style="margin-top:6px">' + msg + "</p>" + promised + '<h3 style="margin-top:10px">Where this comes from</h3><ul class="ev">' + evidence(n.id).map(function (t) { return "<li>" + t + "</li>"; }).join("") + '</ul></div><div><h3>Next step</h3><p class="muted" style="margin-top:6px">' + adviceText(c) + '</p><div class="actions">' + act + "</div></div>";
+  }
+  function adviceText(c) {
+    var late = lateDays(c);
+    if (late <= 0) return state.delay > 0 ? "Delay absorbed by slack. No action needed, but watch the cotton delivery." : (state.shift ? "A second shift gives knitting extra slack." : "On plan. No action needed.");
+    var alt = compute(state.delay, true), altLate = Math.max(0, alt.EF.dispatch - SHIP_BY);
+    var s = "Ship " + plural(late) + " late" + (c.slotLost ? ": the dye batch was missed (next batch " + fmt(c.ES.dye) + "). " : ". ");
+    if (!state.shift) s += "A second shift on knitting would cut it to " + (altLate > 0 ? plural(altLate) + " late. " : "on time. ");
+    return s + "Compare a second mill and warn the buyer.";
+  }
+  function plansHtml(c) {
+    var f = f0, missed = c.EF.dispatch > SHIP_BY;
+    var items = shortages(c).map(function (i) { return "<tr><td><b>" + i.n + '</b></td><td class="r num">' + f(i.need) + " " + i.u + '</td><td class="r num">' + f(i.hand) + '</td><td class="r num"><b>' + f(i.inc) + " " + i.u + "</b></td><td>" + i.v + "</td></tr>"; }).join("");
+    var prod = [["Dyeing", c.ES.dye, c.EF.dye, c.slotLost ? "Batch " + fmt(SLOTS[0]) + " missed, next " + fmt(c.ES.dye) : "Batch " + fmt(c.ES.dye) + " kept"],
+      ["Knitting", c.ES.knit, c.EF.knit, c.kdur + " days × " + f(c.perDay) + " pairs a day" + (state.shift ? " (two shifts)" : "")], ["Finish and pack", c.ES.pack, c.EF.pack, "4 days"]].map(function (r) { return "<tr><td><b>" + r[0] + '</b></td><td class="num">' + fmt(r[1]) + '</td><td class="num">' + fmt(r[2]) + "</td><td>" + r[3] + "</td></tr>"; }).join("");
+    var disp = [["Truck to port, paperwork", c.ES.dispatch, "2 days"], ["Vessel departs", c.EF.dispatch, missed ? '<span class="chip risk">Misses the ' + fmt(SHIP_BY) + " sailing</span> Rebook" : '<span class="chip ok">Meets the booked sailing</span>'], ["Arrives at US warehouse", c.EF.customer, "Needed by " + fmt(ARRIVE_BY)], ["Payment due", c.EF.customer + 30, "30 days after delivery"]].map(function (r) { return "<tr><td><b>" + r[0] + '</b></td><td class="num">' + fmt(r[1]) + "</td><td>" + r[2] + "</td></tr>"; }).join("");
+    return '<div class="stack-v" style="padding:14px"><div><h3>Purchase plan</h3><div class="tablewrap"><table><thead><tr><th>Item</th><th class="r">Needed</th><th class="r">On hand</th><th class="r">On order</th><th>Vendor</th></tr></thead><tbody>' + items + '</tbody></table></div></div><div><h3>Production plan</h3><div class="tablewrap"><table><thead><tr><th>Step</th><th>Start</th><th>Finish</th><th>Detail</th></tr></thead><tbody>' + prod + '</tbody></table></div></div><div><h3>Dispatch plan</h3><div class="tablewrap"><table><thead><tr><th>Step</th><th>Date</th><th>Detail</th></tr></thead><tbody>' + disp + "</tbody></table></div></div></div>";
+  }
+  function viewOrder() {
+    var c = cur(), base = baseC(), late = lateDays(c), arr = Math.max(0, c.EF.customer - ARRIVE_BY);
+    var h = '<div class="crumbs"><button data-act="go" data-v="orders">Orders</button><span>/</span><span>SO-1182</span></div><div class="stack-v"><div class="stats">' +
+      '<div class="card stat"><small>Predicted ship date</small><strong class="num">' + fmt(c.EF.dispatch) + '</strong><span class="sub">' + (late > 0 ? '<span class="chip risk">' + plural(late) + " late</span>" : '<span class="chip ok">On time</span>') + " booked " + fmt(SHIP_BY) + '</span></div>' +
+      '<div class="card stat"><small>Arrives at US warehouse</small><strong class="num">' + fmt(c.EF.customer) + '</strong><span class="sub">' + (arr > 0 ? '<span class="chip risk">' + plural(arr) + " after " + fmt(ARRIVE_BY) + "</span>" : '<span class="chip ok">Meets ' + fmt(ARRIVE_BY) + "</span>") + '</span></div>' +
+      '<div class="card stat"><small>Cost at risk</small><strong class="num">' + lakh(late * COST_PER_DAY) + '</strong><span class="sub">₹20,000 a day late (sample)</span></div></div>';
+    h += '<div class="card controls"><b>What if</b><div class="slider"><label for="delay">Cotton arrives late by</label><input id="delay" type="range" min="0" max="10" value="' + state.delay + '"><span class="num" style="min-width:4.5em;font-weight:600">' + plural(state.delay) + '</span></div><label style="display:flex;gap:6px;align-items:center"><input id="shift" type="checkbox"' + (state.shift ? " checked" : "") + '> Second shift on knitting</label><button class="btn small" data-act="preset" data-d="4">Try 4 days</button><button class="btn small" data-act="reset">Reset</button><p class="advice">' + adviceText(c) + "</p></div>";
+    h += '<div class="tabs" role="tablist"><button class="tab" role="tab" data-act="ptab" data-t="map" aria-selected="' + (state.ptab === "map") + '">Supplier map</button><button class="tab" role="tab" data-act="ptab" data-t="plan" aria-selected="' + (state.ptab === "plan") + '">Plans</button></div>';
+    if (state.ptab === "map") h += '<div class="card" style="padding:0"><div class="gwrap"><div class="graph" id="graph">' + graphHtml(c, base) + '</div></div><div class="legend">Left border shows status. Dashed outline means the app inferred this supplier. Slack is how many days a step can slip before the ship date moves.</div><div class="detail">' + detailHtml(c, base) + "</div></div>";
+    else h += '<div class="card" style="padding:0">' + plansHtml(c) + "</div>";
+    return h + "</div>";
+  }
+
+  function inboxItems() {
+    var items = [];
+    if (state.voice === "done") items.push({ kind:"Voice note, Tamil", who:"Ravi Spinning", time:"9:42 am", quote:"Madam, the cotton bales will only reach on the 22nd, so the yarn will be a few days late.", fields:[["Order","PO 4471, cotton yarn"],["Cause","Cotton bales late"],["Bales arrive","Jun 22 (planned Jun 18)"],["Yarn finish","Jun 29 (planned Jun 25)"]], conf:"78%", st:"Linked, map updated", cls:"ok" });
+    items.push({ kind:"Email", who:"Chennai trader", time:"8:10 am", quote:"Elastane has cleared customs. We will deliver to your unit on the 21st.", fields:[["Order","PO 4475, elastane"],["Delivery","Jun 21"]], conf:"94%", st:"Linked", cls:"ok" });
+    items.push({ kind:"Excel upload", who:"Store stock count", time:"Yesterday", quote:"40 rows read. Two rows have unclear units.", fields:[["Yarn on hand","1,200 kg"],["Elastane on hand","40 kg"],["Needs review","2 rows"]], conf:"90%", st:"Needs review", cls:"warn" });
+    items.push({ kind:"PDF", who:"PO 5521, US retailer", time:"Jun 3", quote:"Order created as SO-1182: 50,000 pairs, ship by Jul 20.", fields:[["Quantity","50,000 pairs"],["Ship by","Jul 20"]], conf:"99%", st:"Linked", cls:"ok" });
+    return items;
+  }
+  function viewInbox() {
+    var fu = followups(), h = '<div class="stack-v"><div><h2>Inbox</h2><p class="muted">What the app read, and who it has asked. Fix anything that looks wrong.</p></div>';
+    h += '<div class="tabs" role="tablist"><button class="tab" role="tab" data-act="itab" data-t="received" aria-selected="' + (state.inboxTab === "received") + '">Received</button><button class="tab" role="tab" data-act="itab" data-t="follow" aria-selected="' + (state.inboxTab === "follow") + '">Follow-ups (' + fu.length + ")</button></div>";
+    if (state.inboxTab === "follow") {
+      fu.forEach(function (f) {
+        h += '<div class="card item"><div class="row"><h3>' + f.who + '</h3><span class="muted">' + f.what + '</span><span class="chip ' + f.chip.c + '">' + f.chip.t + '</span></div><ul class="ladder">' + f.ladder.map(function (s) { return '<li class="' + (s.d ? "done" : s.n ? "next" : "") + '">' + s.t + "</li>"; }).join("") + "</ul>" + (f.note ? '<p class="muted" style="margin-top:8px">' + f.note + "</p>" : "") + (f.act ? '<div class="actions">' + f.act + "</div>" : "") + "</div>";
+      });
+      return h + '<p class="muted">Reminders follow risk: the thinner the slack and the less reliable the supplier, the sooner the app asks. Nothing is sent without your approval.</p></div>';
+    }
+    h += '<div class="card"><div class="row"><b>Inputs</b><span class="chip idle">WhatsApp</span><span class="chip idle">Email</span><span class="chip idle">Voice</span><span class="chip idle">Excel</span><span class="chip idle">Photo</span></div>';
+    if (state.voice === "idle") h += '<div class="actions"><button class="btn primary" data-act="play">Play a sample voice note from Ravi</button><span class="muted" style="align-self:center">A made-up message, to show what the app does with it.</span></div>';
+    else if (state.voice === "busy") h += '<div class="steps"><span class="wave" aria-hidden="true"><i></i><i></i><i></i><i></i><i></i><i></i><i></i><i></i></span><span class="chip acc pulse">Transcribing Tamil</span><span class="chip acc pulse">Finding the order</span><span class="chip acc pulse">Checking the plan</span></div>';
+    else h += '<div class="actions"><span class="chip ok">Voice note read</span><span class="muted" style="align-self:center">Open Today or the supplier map to see the effect.</span></div>';
+    h += "</div>";
+    inboxItems().forEach(function (it) {
+      h += '<div class="card item"><div class="row"><h3>' + it.who + '</h3><span class="chip idle">' + it.kind + '</span><span class="muted">' + it.time + '</span><span class="chip ' + it.cls + '">' + it.st + '</span></div><p class="quote">' + it.quote + '</p><div class="fields">' + it.fields.map(function (f) { return "<div><small>" + f[0] + "</small><b>" + f[1] + "</b></div>"; }).join("") + '</div><div class="actions"><span class="chip acc">Confidence ' + it.conf + '</span><button class="btn small" data-act="toast" data-m="In the real app this opens a correction form.">Correct it</button><button class="btn small" data-act="toast" data-m="In the real app this plays the original message.">View source</button></div></div>';
+    });
+    return h + "</div>";
+  }
+
+  function viewShortages() {
+    var c = cur(), sh = shortages(c), short = sh.filter(function (x) { return x.st.c === "risk"; }).length, thin = sh.filter(function (x) { return x.st.c === "warn"; }).length;
+    var h = '<div class="stack-v"><div><h2>Shortages</h2><p class="muted">Stock and incoming supply against what SO-1182 needs, and when each part is needed.</p></div>';
+    h += '<div class="card att ' + (short ? "risk" : thin ? "warn" : "ok") + '"><div class="row"><span class="chip ' + (short ? "risk" : thin ? "warn" : "ok") + '">' + (short ? short + " will run short" : thin ? thin + " thin" : "All covered") + "</span><b>" + (short ? "Yarn will not reach the dye house in time." : thin ? "Nothing is short yet, but " + thin + " parts have no room for error." : "Every part arrives before it is needed.") + '</b></div><div class="actions"><button class="btn primary" data-act="ask" data-q="What will run short?">Ask what to do</button></div></div>';
+    h += '<div class="card" style="padding:0"><div class="tablewrap"><table><thead><tr><th>Part</th><th class="r">Needed</th><th class="r">Have + coming</th><th class="r">Spare</th><th>Needed by</th><th>Expected</th><th>Status</th></tr></thead><tbody>' +
+      sh.map(function (i) { return "<tr><td><b>" + i.n + "</b><br><span class=\"muted\">" + i.v + '</span></td><td class="r num">' + f0(i.need) + " " + i.u + '</td><td class="r num">' + f0(i.hand + i.inc) + '</td><td class="r num">' + f0(i.spare) + '</td><td class="num">' + fmt(i.needBy) + '</td><td class="num">' + fmt(i.exp) + '</td><td><span class="chip ' + i.st.c + '">' + i.st.t + '</span><div class="muted" style="margin-top:4px;max-width:34ch">' + i.why.join(" ") + "</div></td></tr>"; }).join("") + "</tbody></table></div></div></div>";
+    return h;
+  }
+
+  function viewSuppliers() {
+    var fu = followups(), h = '<div class="stack-v"><div><h2>Suppliers</h2><p class="muted">Promises compared with what happened. Sample history.</p></div><div class="sgrid">';
+    SUPPLIERS.forEach(function (s) {
+      var mx = Math.max.apply(null, s.hist.concat([1])), f = fu.filter(function (x) { return x.who === s.n; })[0];
+      h += '<div class="card"><div class="row"><h3>' + s.n + '</h3><span class="chip ' + (s.slip >= 5 ? "risk" : s.slip >= 2 ? "warn" : "ok") + '">Usually ' + (s.slip === 0 ? "on time" : "+" + s.slip + " days") + '</span></div><p class="muted">' + s.what + " · " + s.ch + '</p><div class="bars" aria-label="Days late on the last six orders">' + s.hist.map(function (v) { return '<span class="' + (v >= 5 ? "hi" : "") + '" style="height:' + Math.max(5, Math.round(v / mx * 100)) + '%"><i>' + v + "</i></span>"; }).join("") + '</div><small class="muted">Days late, last six orders</small><p style="margin-top:8px">' + s.note + "</p>" + (f ? '<p style="margin-top:8px"><span class="chip ' + f.chip.c + '">' + f.chip.t + '</span> <span class="muted">' + f.what + "</span></p>" : "") + "</div>";
+    });
+    return h + "</div></div>";
+  }
+
+  /* ---------- agent ---------- */
+  function addChat(m) { state.chat.push(m); }
+  function chatHtml() {
+    return state.chat.map(function (m) {
+      if (m.t === "user") return '<div class="msg user">' + m.html + "</div>";
+      if (m.t === "draft") { var sent = state.sent[m.key];
+        return '<div class="draft"><div class="lab">' + m.label + "</div><q>" + m.text + '</q><div class="actions"><button class="btn small" data-act="toast" data-m="In the real app you can edit the text here.">Edit</button><button class="btn small primary" data-act="send" data-k="' + m.key + '"' + (sent ? " disabled" : "") + ">" + (sent ? "Approved (sample)" : "Approve and send") + "</button></div></div>"; }
+      if (m.t === "opt") return '<div class="opt"><b>' + m.title + '</b><p class="muted">' + m.text + '</p><div class="actions"><button class="btn small primary" data-act="apply-shift"' + (state.shift ? " disabled" : "") + ">" + (state.shift ? "Applied" : "Apply") + "</button></div></div>";
+      return '<div class="msg">' + m.html + "</div>";
+    }).join("");
+  }
+  function renderChat() {
+    var ch = $("#chat"); ch.innerHTML = chatHtml(); ch.scrollTop = ch.scrollHeight;
+    $("#chips").innerHTML = ["What is at risk this week?","Why is yarn late?","What will run short?","Who has not replied?"].map(function (q) { return '<button type="button" class="btn small" data-act="ask" data-q="' + q + '">' + q + "</button>"; }).join("");
+  }
+  function answer(q) {
+    var c = cur(), late = lateDays(c), sh = shortages(c);
+    if (/second shift|shift/i.test(q)) { var alt = compute(state.delay, true), al = Math.max(0, alt.EF.dispatch - SHIP_BY); return { html:"Knitting would take " + alt.kdur + " days instead of " + compute(state.delay, false).kdur + ". With the current delay the ship date becomes " + fmt(alt.EF.dispatch) + (al > 0 ? ", " + plural(al) + " late." : ", on time."), opt:!state.shift && late > 0 }; }
+    if (/short|run out|stock|shortage/i.test(q)) {
+      var bad = sh.filter(function (x) { return x.st.c !== "ok"; });
+      return { html:(bad.length ? "Parts to watch for SO-1182:<ul>" + bad.map(function (x) { return "<li><b>" + x.n + "</b>: " + x.st.t.toLowerCase() + ". " + x.why[0] + "</li>"; }).join("") + "</ul>" : "Every part arrives before it is needed.") + "Cartons are the one to order more of: there is no spare at all." };
+    }
+    if (/reply|replied|silent|reminder|follow/i.test(q) && !/sri print/i.test(q)) {
+      var w = followups().filter(function (x) { return x.chip.c !== "ok"; });
+      return { html:w.length ? "Waiting on:<ul>" + w.map(function (x) { return "<li><b>" + x.who + "</b>: " + x.what + " (" + x.chip.t.toLowerCase() + ")</li>"; }).join("") + "</ul>I follow up by message first, then a call, then I alert you." : "Everyone has replied." };
+    }
+    if (/sri print|labels/i.test(q)) return { html:"I drafted a reminder to Sri Print in Tamil asking for the dispatch date. Approve it to send.", draft:{ key:"sri", label:"Draft to Sri Print, in Tamil (English shown here)", text:"Please confirm the date you will send the labels and cartons for PO 4480." } };
+    if (/yarn|why|late/i.test(q)) {
+      if (state.delay === 0) return { html:"Yarn is on plan for " + fmt(c.EF.yarn) + ". Ravi's dates usually run about 6 days late and this step has 2 days of slack, so I am watching it." };
+      return { html:"Ravi's cotton bales arrive " + fmt(c.EF.cotton) + ", " + plural(state.delay) + " later than planned. Yarn finishes " + fmt(c.EF.yarn) + (c.slotLost ? ", which misses the Jun 28 dye batch. The next batch is " + fmt(c.ES.dye) + ", and the ship date moves to " + fmt(c.EF.dispatch) + "." : ". That is inside the slack, so the ship date holds.") };
+    }
+    if (/risk|week|attention/i.test(q)) return { html: late > 0 ? "One order is at risk: SO-1182 ships " + plural(late) + " late (" + fmt(c.EF.dispatch) + "), about " + lakh(late * COST_PER_DAY) + " at ₹20,000 a day. Sri Print has also been silent for 6 days." : "Nothing is late today. Watch: yarn for SO-1182 has 2 days of slack and Ravi usually slips about 6 days. Cartons have no spare stock." };
+    return { html:"In this prototype I answer a few questions: what is at risk, why yarn is late, what will run short, who has not replied, and what a second shift does." };
+  }
+  function ask(q) {
+    addChat({ t:"user", html:q }); var a = answer(q); addChat({ t:"text", html:a.html });
+    if (a.opt) addChat({ t:"opt", title:"Option: second shift on knitting", text:"Recovers about 4 days. Overtime cost is not included in this sample." });
+    if (a.draft) addChat({ t:"draft", key:a.draft.key, label:a.draft.label, text:a.draft.text });
+    renderChat();
+  }
+  function seedChat() {
+    state.chat = [];
+    addChat({ t:"text", html:"Good morning, Meena. Nothing is late today. One thing to watch: Ravi's dates usually run about 6 days late, and the yarn step for SO-1182 has 2 days of slack." });
+    addChat({ t:"text", html:"Try the Inbox: play Ravi's sample voice note and see what changes." });
+  }
+
+  /* ---------- render and events ---------- */
+  var TITLES = { today:"Today", orders:"Orders", order:"SO-1182", inbox:"Inbox", shortages:"Shortages", suppliers:"Suppliers" };
+  function render() {
+    $("#title").textContent = TITLES[state.view];
+    $("#nav-side").innerHTML = navHtml(); $("#nav-bottom").innerHTML = navHtml();
+    $("#shell").classList.toggle("docked", state.view !== "order");
+    var fn = { today:viewToday, orders:viewOrders, order:viewOrder, inbox:viewInbox, shortages:viewShortages, suppliers:viewSuppliers }[state.view];
+    var main = $("#main"), top = main.scrollTop; main.innerHTML = fn(); main.scrollTop = top;
+    $("#agent").classList.toggle("open", state.agentOpen); $("#scrim").hidden = !state.agentOpen;
+    renderChat();
+    if (state.view === "order" && state.ptab === "map") drawEdges();
+    var d = $("#delay"), s = $("#shift");
+    if (d) d.addEventListener("input", function () { state.delay = +d.value; render(); var nd = $("#delay"); if (nd) nd.focus(); });
+    if (s) s.addEventListener("change", function () { state.shift = s.checked; render(); });
+  }
+  function drawEdges() {
+    var g = $("#graph"), svg = $("#edges"); if (!g || !svg) return;
+    var gr = g.getBoundingClientRect(); if (gr.width === 0) return;
+    svg.setAttribute("width", g.scrollWidth); svg.setAttribute("height", g.offsetHeight);
+    var c = cur(), base = baseC(), out = "";
+    EDGES.forEach(function (e) {
+      var a = g.querySelector('[data-id="' + e[0] + '"]'), b = g.querySelector('[data-id="' + e[1] + '"]'); if (!a || !b) return;
+      var ra = a.getBoundingClientRect(), rb = b.getBoundingClientRect();
+      var x1 = ra.right - gr.left, y1 = ra.top + ra.height / 2 - gr.top, x2 = rb.left - gr.left, y2 = rb.top + rb.height / 2 - gr.top, dx = (x2 - x1) / 2;
+      var from = NODES.filter(function (n) { return n.id === e[0]; })[0], cl = statusOf(from, c, base).c;
+      out += '<path class="' + (cl === "risk" ? "risk" : cl === "warn" ? "warn" : "") + (from.inferred ? " inf" : "") + '" d="M' + x1 + " " + y1 + " C" + (x1 + dx) + " " + y1 + ", " + (x2 - dx) + " " + y2 + ", " + x2 + " " + y2 + '"/>';
+    });
+    svg.innerHTML = out;
+  }
+  function toast(m) { var t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, 2600); }
+  function go(v) { state.view = v; state.agentOpen = false; try { history.replaceState(null, "", "#" + v); } catch (e) {} render(); $("#main").scrollTop = 0; window.scrollTo(0, 0); }
+
+  function playVoice() {
+    state.voice = "busy"; render();
+    setTimeout(function () {
+      state.voice = "done"; state.delay = 4; state.shift = false; state.sel = "cotton";
+      var c = cur();
+      addChat({ t:"text", html:"I read Ravi's voice note (Tamil). Cotton bales arrive " + fmt(c.EF.cotton) + ", 4 days later than planned. That uses up the slack and misses the dye batch, so SO-1182 now ships " + fmt(c.EF.dispatch) + ", " + plural(lateDays(c)) + " late." });
+      addChat({ t:"draft", key:"ravi", label:"Draft to Ravi, in Tamil (English shown here)", text:"Please confirm when the cotton arrives and send a photo of the bales." });
+      addChat({ t:"opt", title:"Option: second shift on knitting", text:"Cuts the delay from 9 days to 5. Overtime cost is not included in this sample." });
+      addChat({ t:"draft", key:"cust", label:"Draft update to the US retailer", text:"Our yarn supplier has a delay. We now expect to ship on " + fmt(c.EF.dispatch) + ", " + plural(lateDays(c)) + " after plan, and we are working to recover time." });
+      render(); toast("Map updated: ship date is now " + fmt(c.EF.dispatch));
+    }, 1500);
+  }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-act]"); if (!t || t.disabled) return;
+    var a = t.getAttribute("data-act");
+    if (a === "go") go(t.getAttribute("data-v"));
+    else if (a === "open-order") { state.view = "order"; state.agentOpen = false; try { history.replaceState(null, "", "#order"); } catch (e1) {} render(); $("#main").scrollTop = 0; window.scrollTo(0, 0); }
+    else if (a === "node") { state.sel = t.getAttribute("data-id"); render(); }
+    else if (a === "ptab") { state.ptab = t.getAttribute("data-t"); render(); }
+    else if (a === "itab") { state.inboxTab = t.getAttribute("data-t"); render(); }
+    else if (a === "preset") { state.delay = +t.getAttribute("data-d"); render(); }
+    else if (a === "reset") { state.delay = 0; state.shift = false; render(); }
+    else if (a === "reset-all") { state.delay = 0; state.shift = false; state.voice = "idle"; state.sent = {}; state.replied = {}; state.sel = "yarn"; state.inboxTab = "received"; seedChat(); go("today"); }
+    else if (a === "play") playVoice();
+    else if (a === "agent-open") { state.agentOpen = true; render(); }
+    else if (a === "agent-close") { state.agentOpen = false; render(); }
+    else if (a === "ask") { state.agentOpen = true; render(); ask(t.getAttribute("data-q")); }
+    else if (a === "send") { state.sent[t.getAttribute("data-k")] = true; render(); toast("Sample only. Nothing was sent."); }
+    else if (a === "reply-ravi") { state.replied.ravi = true; render(); toast("Reply read: arrival Jun 22 confirmed, confidence up to 92%"); }
+    else if (a === "apply-shift") { state.shift = true; var c = cur(); addChat({ t:"text", html:"Second shift applied. Knitting now takes " + c.kdur + " days and SO-1182 ships " + fmt(c.EF.dispatch) + ", " + (lateDays(c) > 0 ? plural(lateDays(c)) + " late. Next best step: compare a second mill for part of the yarn." : "on time.") }); render(); }
+    else if (a === "toast") toast(t.getAttribute("data-m"));
+  });
+  $("#scrim").addEventListener("click", function () { state.agentOpen = false; render(); });
+  $("#askform").addEventListener("submit", function (e) { e.preventDefault(); var i = $("#q"); if (i.value.trim()) { ask(i.value.trim()); i.value = ""; } });
+  window.addEventListener("resize", function () { if (state.view === "order" && state.ptab === "map") drawEdges(); });
+  window.addEventListener("hashchange", function () { var v = location.hash.replace("#", ""); if (TITLES[v] && v !== state.view) { state.view = v; render(); } });
+
+  seedChat();
+  var v0 = location.hash.replace("#", ""); if (TITLES[v0]) state.view = v0;
+  render();
+  if (document.fonts && document.fonts.ready) document.fonts.ready.then(function () { if (state.view === "order") drawEdges(); });
+})();
+</script>

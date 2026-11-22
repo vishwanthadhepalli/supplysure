@@ -1,0 +1,7 @@
+{
+  "suppliers": [
+    {"id": "sup-ravi", "name": "Ravi Cotton Traders", "kind": "yarn", "language": "ta", "discord_channel": "supplier-ravi", "usual_slip_days": 3, "single_source": true},
+    {"id": "sup-chennai", "name": "Chennai Packaging Trader", "kind": "other", "language": "en", "discord_channel": "chennai-trader", "usual_slip_days": 1, "single_source": false},
+    {"id": "sup-sriprint", "name": "Sri Print Labels", "kind": "trim", "language": "ta", "discord_channel": "sri-print", "usual_slip_days": 2, "single_source": false}
+  ]
+}

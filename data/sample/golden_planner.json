@@ -1,0 +1,344 @@
+{
+  "_note": "Expected planner output. Dates are ISO (sample year 2027). Generated from the reference prototype in reference/prototypes/plant-planner.html logic. 'ready' = last packing day + 2 days dispatch. 'slack' = ship_by minus ready, in days.",
+  "priority_default": [
+    "SO-1182",
+    "SO-1190",
+    "SO-1195"
+  ],
+  "cases": [
+    {
+      "name": "baseline",
+      "description": "Base plan: planned maintenance only.",
+      "flags": {
+        "second_shift": false,
+        "new_request_ahead_of_SO_1190": false,
+        "yarn_delay_days": 0,
+        "extra_downtime": []
+      },
+      "orders": {
+        "SO-1182": {
+          "dye_start": "2027-06-28",
+          "dye_finish": "2027-07-02",
+          "knit_start": "2027-07-03",
+          "knit_finish": "2027-07-14",
+          "pack_finish": "2027-07-18",
+          "ready": "2027-07-20",
+          "ship_by": "2027-07-20",
+          "slack_days": 0
+        },
+        "SO-1190": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-14",
+          "knit_finish": "2027-07-20",
+          "pack_finish": "2027-07-24",
+          "ready": "2027-07-26",
+          "ship_by": "2027-08-12",
+          "slack_days": 17
+        },
+        "SO-1195": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-20",
+          "knit_finish": "2027-07-28",
+          "pack_finish": "2027-08-01",
+          "ready": "2027-08-03",
+          "ship_by": "2027-07-28",
+          "slack_days": -6
+        }
+      }
+    },
+    {
+      "name": "second_shift_on_knitting",
+      "description": "Knitting runs two shifts (x1.5 output).",
+      "flags": {
+        "second_shift": true,
+        "new_request_ahead_of_SO_1190": false,
+        "yarn_delay_days": 0,
+        "extra_downtime": []
+      },
+      "orders": {
+        "SO-1182": {
+          "dye_start": "2027-06-28",
+          "dye_finish": "2027-07-02",
+          "knit_start": "2027-07-03",
+          "knit_finish": "2027-07-10",
+          "pack_finish": "2027-07-17",
+          "ready": "2027-07-19",
+          "ship_by": "2027-07-20",
+          "slack_days": 1
+        },
+        "SO-1190": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-12",
+          "knit_finish": "2027-07-15",
+          "pack_finish": "2027-07-21",
+          "ready": "2027-07-23",
+          "ship_by": "2027-08-12",
+          "slack_days": 20
+        },
+        "SO-1195": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-15",
+          "knit_finish": "2027-07-20",
+          "pack_finish": "2027-07-27",
+          "ready": "2027-07-29",
+          "ship_by": "2027-07-28",
+          "slack_days": -1
+        }
+      }
+    },
+    {
+      "name": "new_request_ahead_of_SO-1190",
+      "description": "SO-1195 is scheduled before SO-1190.",
+      "flags": {
+        "second_shift": false,
+        "new_request_ahead_of_SO_1190": true,
+        "yarn_delay_days": 0,
+        "extra_downtime": []
+      },
+      "orders": {
+        "SO-1182": {
+          "dye_start": "2027-06-28",
+          "dye_finish": "2027-07-02",
+          "knit_start": "2027-07-03",
+          "knit_finish": "2027-07-14",
+          "pack_finish": "2027-07-18",
+          "ready": "2027-07-20",
+          "ship_by": "2027-07-20",
+          "slack_days": 0
+        },
+        "SO-1190": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-23",
+          "knit_finish": "2027-07-28",
+          "pack_finish": "2027-08-01",
+          "ready": "2027-08-03",
+          "ship_by": "2027-08-12",
+          "slack_days": 9
+        },
+        "SO-1195": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-14",
+          "knit_finish": "2027-07-23",
+          "pack_finish": "2027-07-27",
+          "ready": "2027-07-29",
+          "ship_by": "2027-07-28",
+          "slack_days": -1
+        }
+      }
+    },
+    {
+      "name": "second_shift_and_new_request_ahead",
+      "description": "Both options together.",
+      "flags": {
+        "second_shift": true,
+        "new_request_ahead_of_SO_1190": true,
+        "yarn_delay_days": 0,
+        "extra_downtime": []
+      },
+      "orders": {
+        "SO-1182": {
+          "dye_start": "2027-06-28",
+          "dye_finish": "2027-07-02",
+          "knit_start": "2027-07-03",
+          "knit_finish": "2027-07-10",
+          "pack_finish": "2027-07-17",
+          "ready": "2027-07-19",
+          "ship_by": "2027-07-20",
+          "slack_days": 1
+        },
+        "SO-1190": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-17",
+          "knit_finish": "2027-07-20",
+          "pack_finish": "2027-07-27",
+          "ready": "2027-07-29",
+          "ship_by": "2027-08-12",
+          "slack_days": 14
+        },
+        "SO-1195": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-12",
+          "knit_finish": "2027-07-17",
+          "pack_finish": "2027-07-23",
+          "ready": "2027-07-25",
+          "ship_by": "2027-07-28",
+          "slack_days": 3
+        }
+      }
+    },
+    {
+      "name": "two_knitting_machines_down_jul3_to_jul10",
+      "description": "Two extra knitting machines down 2027-07-03 to 2027-07-10.",
+      "flags": {
+        "second_shift": false,
+        "new_request_ahead_of_SO_1190": false,
+        "yarn_delay_days": 0,
+        "extra_downtime": [
+          {
+            "step": "knit",
+            "from": "2027-07-03",
+            "to": "2027-07-10",
+            "machines_down": 2
+          }
+        ]
+      },
+      "orders": {
+        "SO-1182": {
+          "dye_start": "2027-06-28",
+          "dye_finish": "2027-07-02",
+          "knit_start": "2027-07-03",
+          "knit_finish": "2027-07-16",
+          "pack_finish": "2027-07-20",
+          "ready": "2027-07-22",
+          "ship_by": "2027-07-20",
+          "slack_days": -2
+        },
+        "SO-1190": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-16",
+          "knit_finish": "2027-07-22",
+          "pack_finish": "2027-07-26",
+          "ready": "2027-07-28",
+          "ship_by": "2027-08-12",
+          "slack_days": 15
+        },
+        "SO-1195": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-22",
+          "knit_finish": "2027-07-29",
+          "pack_finish": "2027-08-02",
+          "ready": "2027-08-04",
+          "ship_by": "2027-07-28",
+          "slack_days": -7
+        }
+      }
+    },
+    {
+      "name": "yarn_late_2_days_all_orders",
+      "description": "Every order's yarn arrives 2 days late.",
+      "flags": {
+        "second_shift": false,
+        "new_request_ahead_of_SO_1190": false,
+        "yarn_delay_days": 2,
+        "extra_downtime": []
+      },
+      "orders": {
+        "SO-1182": {
+          "dye_start": "2027-06-28",
+          "dye_finish": "2027-07-02",
+          "knit_start": "2027-07-03",
+          "knit_finish": "2027-07-14",
+          "pack_finish": "2027-07-18",
+          "ready": "2027-07-20",
+          "ship_by": "2027-07-20",
+          "slack_days": 0
+        },
+        "SO-1190": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-14",
+          "knit_finish": "2027-07-20",
+          "pack_finish": "2027-07-24",
+          "ready": "2027-07-26",
+          "ship_by": "2027-08-12",
+          "slack_days": 17
+        },
+        "SO-1195": {
+          "dye_start": "2027-07-16",
+          "dye_finish": "2027-07-20",
+          "knit_start": "2027-07-21",
+          "knit_finish": "2027-07-28",
+          "pack_finish": "2027-08-01",
+          "ready": "2027-08-03",
+          "ship_by": "2027-07-28",
+          "slack_days": -6
+        }
+      }
+    },
+    {
+      "name": "yarn_late_4_days_all_orders",
+      "description": "Every order's yarn arrives 4 days late.",
+      "flags": {
+        "second_shift": false,
+        "new_request_ahead_of_SO_1190": false,
+        "yarn_delay_days": 4,
+        "extra_downtime": []
+      },
+      "orders": {
+        "SO-1182": {
+          "dye_start": "2027-07-07",
+          "dye_finish": "2027-07-11",
+          "knit_start": "2027-07-12",
+          "knit_finish": "2027-07-25",
+          "pack_finish": "2027-07-29",
+          "ready": "2027-07-31",
+          "ship_by": "2027-07-20",
+          "slack_days": -11
+        },
+        "SO-1190": {
+          "dye_start": "2027-07-16",
+          "dye_finish": "2027-07-20",
+          "knit_start": "2027-07-25",
+          "knit_finish": "2027-07-30",
+          "pack_finish": "2027-08-03",
+          "ready": "2027-08-05",
+          "ship_by": "2027-08-12",
+          "slack_days": 7
+        },
+        "SO-1195": {
+          "dye_start": "2027-07-16",
+          "dye_finish": "2027-07-20",
+          "knit_start": "2027-07-30",
+          "knit_finish": "2027-08-06",
+          "pack_finish": "2027-08-10",
+          "ready": "2027-08-12",
+          "ship_by": "2027-07-28",
+          "slack_days": -15
+        }
+      }
+    }
+  ],
+  "materials_netting": {
+    "_note": "Order SO-1182. need = pairs x per-pair quantity x (1 + waste), rounded up. buy = ceil(max(need - on_hand, 0) / moq) x moq.",
+    "items": [
+      {
+        "item": "cotton_yarn_kg",
+        "need": 4950,
+        "on_hand": 1200,
+        "moq": 500,
+        "buy": 4000
+      },
+      {
+        "item": "elastane_kg",
+        "need": 165,
+        "on_hand": 40,
+        "moq": 50,
+        "buy": 150
+      },
+      {
+        "item": "labels_pcs",
+        "need": 51000,
+        "on_hand": 8000,
+        "moq": 5000,
+        "buy": 45000
+      },
+      {
+        "item": "cartons_pcs",
+        "need": 4250,
+        "on_hand": 500,
+        "moq": 250,
+        "buy": 3750
+      }
+    ]
+  }
+}

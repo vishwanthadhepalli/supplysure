@@ -1,0 +1,378 @@
+<title>Factory Brain</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+  /* Layout concept: one graph read left to right as the flow of work, from outside suppliers to the customer.
+     Node colour says what a thing is. A coloured ring says whether the date it supports can be met. */
+  :root {
+    --bg: #eef1f6; --surface: #ffffff; --ink: #161c2e; --muted: #566079; --line: #d3d9e4; --fill: #e6eaf2;
+    --accent: #27348b; --on-accent: #ffffff; --accent-soft: #e3e7fb;
+    --ok: #17694a; --ok-bg: #dff3e8; --warn: #8a5200; --warn-bg: #fdeccb; --risk: #b3261e; --risk-bg: #fbe5e2;
+    --t-customer: #7c5cbf; --t-order: #27348b; --t-product: #8a6d3b; --t-material: #64748b; --t-supplier: #0e7490;
+    --t-machine: #be185d; --t-logistics: #0369a1; --t-document: #6b7280; --t-event: #161c2e;
+    --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1320; --surface: #181e2f; --ink: #e8ebf4; --muted: #9aa4bd; --line: #2e3650; --fill: #222a40;
+      --accent: #9db0ff; --on-accent: #0f1630; --accent-soft: #232d57;
+      --ok: #6fd0a0; --ok-bg: #14302a; --warn: #f2b45a; --warn-bg: #34270f; --risk: #ff9c90; --risk-bg: #3b1f1d;
+      --t-customer: #b79cf2; --t-order: #9db0ff; --t-product: #d2b27a; --t-material: #a3b0c2; --t-supplier: #5cc7e0;
+      --t-machine: #f08ab8; --t-logistics: #6db9ec; --t-document: #aeb4be; --t-event: #e8ebf4; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1320; --surface: #181e2f; --ink: #e8ebf4; --muted: #9aa4bd; --line: #2e3650; --fill: #222a40;
+    --accent: #9db0ff; --on-accent: #0f1630; --accent-soft: #232d57;
+    --ok: #6fd0a0; --ok-bg: #14302a; --warn: #f2b45a; --warn-bg: #34270f; --risk: #ff9c90; --risk-bg: #3b1f1d;
+    --t-customer: #b79cf2; --t-order: #9db0ff; --t-product: #d2b27a; --t-material: #a3b0c2; --t-supplier: #5cc7e0;
+    --t-machine: #f08ab8; --t-logistics: #6db9ec; --t-document: #aeb4be; --t-event: #e8ebf4; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.45; margin: 0;
+    padding-block: 18px 30px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 1400px; margin: 0 auto; display: flex; flex-direction: column; gap: 12px; }
+  h1, h2, h3 { font-family: var(--display); margin: 0; letter-spacing: -0.01em; }
+  h1 { font-size: 22px; } h2 { font-size: 15px; } h3 { font-size: 13px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+
+  .top { display: flex; justify-content: space-between; align-items: flex-end; gap: 12px; flex-wrap: wrap; }
+  .stats { display: flex; gap: 8px; flex-wrap: wrap; }
+  .pill { background: var(--surface); border: 1px solid var(--line); border-radius: 999px; padding: 4px 12px; font-size: 12px; color: var(--muted); }
+  .pill b { color: var(--ink); font-variant-numeric: tabular-nums; }
+
+  .card { background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; min-width: 0; }
+  .toolbar { display: flex; flex-wrap: wrap; gap: 10px 18px; align-items: center; }
+  .toolbar .lab { font-weight: 600; }
+  .slider { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+  input[type="range"] { width: 150px; max-width: 100%; accent-color: var(--accent); }
+  .check { display: flex; align-items: center; gap: 6px; }
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 5px 11px; font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .btn.small { padding: 3px 9px; font-size: 12px; }
+  .btn:focus-visible, input:focus-visible, .gn:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .filters { display: flex; gap: 6px; flex-wrap: wrap; }
+  .fchip { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 3px 10px; font-size: 12px; font-weight: 600; cursor: pointer; }
+  .fchip i { width: 10px; height: 10px; border-radius: 3px; display: inline-block; }
+  .fchip[aria-pressed="false"] { opacity: 0.45; }
+
+  .grid { display: grid; grid-template-columns: minmax(0, 1fr) 310px; gap: 12px; align-items: start; }
+  .gwrap { overflow-x: auto; }
+  svg.brain { display: block; width: 100%; min-width: 880px; height: auto; }
+  .brain text { font-family: var(--sans); }
+  .brain .colhead { font-size: 10.5px; font-weight: 600; fill: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; }
+  .brain .edge { fill: none; stroke: var(--line); stroke-width: 1.6; transition: opacity 0.15s; }
+  .brain .edge.inf { stroke-dasharray: 4 3; }
+  .brain .edge.hl { stroke: var(--accent); stroke-width: 2.6; }
+  .brain .edge.risk { stroke: var(--risk); stroke-width: 2.6; }
+  .brain .gn { cursor: pointer; transition: opacity 0.15s; }
+  .brain .gn rect.body { fill: var(--surface); stroke: var(--line); stroke-width: 1; }
+  .brain .gn.inferred rect.body { stroke-dasharray: 4 3; }
+  .brain .gn.ev rect.body { stroke-dasharray: 2 2; }
+  .brain .gn .ring { fill: none; stroke-width: 2.6; }
+  .brain .gn.sel rect.body { stroke: var(--accent); stroke-width: 2.4; }
+  .brain .gn .name { font-size: 12px; font-weight: 600; fill: var(--ink); }
+  .brain .gn .sub { font-size: 10.5px; fill: var(--muted); }
+  .brain .dim { opacity: 0.18; }
+  .tp-customer .bar { fill: var(--t-customer); } .tp-order .bar { fill: var(--t-order); } .tp-product .bar { fill: var(--t-product); }
+  .tp-material .bar { fill: var(--t-material); } .tp-supplier .bar { fill: var(--t-supplier); } .tp-machine .bar { fill: var(--t-machine); }
+  .tp-logistics .bar { fill: var(--t-logistics); } .tp-document .bar { fill: var(--t-document); } .tp-event .bar { fill: var(--t-event); }
+  .ring.ok { stroke: var(--ok); } .ring.warn { stroke: var(--warn); } .ring.risk { stroke: var(--risk); }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12px; padding-top: 8px; }
+  .legend .rg { display: inline-block; width: 12px; height: 12px; border-radius: 4px; border: 2.4px solid; vertical-align: -2px; margin-right: 4px; }
+
+  .side { display: flex; flex-direction: column; gap: 12px; }
+  .qs { display: flex; flex-direction: column; gap: 6px; }
+  .qs .btn { text-align: left; }
+  .answer { background: var(--fill); border-radius: 10px; padding: 10px 12px; }
+  .answer ul { margin: 6px 0 0; padding-left: 18px; } .answer li { margin-bottom: 3px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .chip.risk { background: var(--risk-bg); color: var(--risk); } .chip.idle { background: var(--fill); color: var(--muted); }
+  .chip.acc { background: var(--accent-soft); color: var(--accent); }
+  .tt { display: inline-block; width: 10px; height: 10px; border-radius: 3px; margin-right: 6px; vertical-align: -1px; }
+  .kv { display: grid; grid-template-columns: auto 1fr; gap: 3px 12px; margin: 8px 0 0; }
+  .kv dt { color: var(--muted); } .kv dd { margin: 0; font-weight: 500; }
+  .rel { display: flex; flex-wrap: wrap; gap: 5px; margin-top: 5px; }
+  .rel button { border: 1px solid var(--line); background: var(--surface); border-radius: 999px; padding: 2px 9px; font-size: 12px; cursor: pointer; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .sub2 { font-size: 12px; font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); margin-top: 10px; }
+
+  @media (max-width: 980px) { .grid { grid-template-columns: minmax(0, 1fr); } }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; } }
+</style>
+
+<div class="wrap">
+  <header class="top">
+    <div>
+      <h1>Factory Brain</h1>
+      <p class="muted">One graph of orders, suppliers, materials, machines and documents. The agent reads it to decide what to do. Sample data.</p>
+    </div>
+    <div class="stats" id="stats"></div>
+  </header>
+
+  <section class="card toolbar" aria-label="What-if controls">
+    <span class="lab">What if</span>
+    <div class="slider"><label for="yd">Ravi's yarn is late by</label><input id="yd" type="range" min="0" max="10" value="0"><span class="num" id="ydv" style="min-width:4.5em;font-weight:600">0 days</span></div>
+    <label class="check"><input id="down" type="checkbox"> 2 knitting machines down Jul 3 to 10</label>
+    <label class="check"><input id="second" type="checkbox"> Second shift on knitting</label>
+    <button class="btn small" id="reset" type="button">Reset</button>
+    <span class="muted" id="simnote"></span>
+  </section>
+
+  <section class="filters" id="filters" aria-label="Show or hide node types"></section>
+
+  <div class="grid">
+    <div class="card">
+      <div class="gwrap"><svg class="brain" id="svg" role="group" aria-label="Factory graph"></svg></div>
+      <div class="legend">
+        <span><span class="rg" style="border-color:var(--ok)"></span>Date can be met</span>
+        <span><span class="rg" style="border-color:var(--warn)"></span>Tight or exposed</span>
+        <span><span class="rg" style="border-color:var(--risk)"></span>Date will be missed</span>
+        <span>Dashed outline: inferred or external</span>
+        <span>Select any node to inspect it</span>
+      </div>
+    </div>
+    <aside class="side">
+      <section class="card"><h2>Ask the graph</h2><div class="qs" id="qs" style="margin-top:8px"></div></section>
+      <section class="card answer" id="answer" aria-live="polite"><p class="muted">Pick a question, or select a node and trace what it feeds or depends on.</p></section>
+      <section class="card" id="inspect"></section>
+    </aside>
+  </div>
+</div>
+
+<script>
+(function () {
+  var D = function (m, d) { return Math.round(Date.UTC(2027, m - 1, d) / 864e5); };
+  var MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var fmt = function (n) { var t = new Date(n * 864e5); return MN[t.getUTCMonth()] + " " + t.getUTCDate(); };
+  var plural = function (n) { return n + (Math.abs(n) === 1 ? " day" : " days"); };
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); };
+
+  /* ---------- scheduling engine (same logic as the planner prototype) ---------- */
+  var SLOTS = [D(6,28), D(7,7), D(7,16), D(7,25)];
+  var proc = { knit:{ n:12, rate:350 }, link:{ n:6, rate:800 }, board:{ n:2, rate:2500 }, pair:{ n:30, rate:200 }, pack:{ n:13, rate:500 } };
+  var STEPS = ["knit","link","board","pair","pack"];
+  var DOWN0 = [{ step:"knit", from:D(7,15), to:D(7,25), n:2 }];
+  var ORD = { "SO-1182":{ pairs:50000, shipBy:D(7,20), yarnArr:D(6,25) }, "SO-1190":{ pairs:20000, shipBy:D(8,12), yarnArr:D(7,3) }, "SO-1195":{ pairs:30000, shipBy:D(7,28), yarnArr:D(7,5) } };
+  function cap(id, d, fl) { var n = proc[id].n; (fl.down || []).forEach(function (x) { if (x.step === id && d >= x.from && d <= x.to) n = Math.max(0, n - x.n); }); var c = n * proc[id].rate; if (id === "knit" && fl.second) c *= 1.5; return Math.round(c); }
+  function slotFor(arr) { var a = arr + 1; for (var i = 0; i < SLOTS.length; i++) if (SLOTS[i] >= a) return SLOTS[i]; return a; }
+  function sumTo(u, upto) { var s = 0; for (var k in u) if (+k <= upto) s += u[k]; return s; }
+  function sched(id, committed, fl) {
+    var o = ORD[id], ds = slotFor(o.yarnArr + (fl.yd || 0)), ks = ds + 5, res = { id:id, dye:{ start:ds, finish:ds + 4 }, steps:{} };
+    STEPS.forEach(function (st, i) {
+      var usage = {}, rem = o.pairs, done = 0, d = i === 0 ? ks : res.steps[STEPS[i - 1]].start + 1, first = null, last = null, g = 0;
+      while (rem > 0 && g++ < 400) {
+        var free = cap(st, d, fl) - (committed[st][d] || 0), up = i === 0 ? Infinity : (sumTo(res.steps[STEPS[i - 1]].usage, d - 1) - done);
+        var use = Math.max(0, Math.min(free, up, rem));
+        if (use > 0) { usage[d] = use; done += use; rem -= use; if (first === null) first = d; last = d; }
+        d++;
+      }
+      if (first === null) { first = d; last = d; }
+      for (var k in usage) committed[st][k] = (committed[st][k] || 0) + usage[k];
+      res.steps[st] = { start:first, finish:last, usage:usage };
+    });
+    res.ready = res.steps.pack.finish + 2; res.slack = o.shipBy - res.ready; return res;
+  }
+  function computeAll(fl) { var c = {}; STEPS.forEach(function (s) { c[s] = {}; }); var out = {}; ["SO-1182","SO-1190","SO-1195"].forEach(function (id) { out[id] = sched(id, c, fl); }); return out; }
+
+  /* ---------- the graph ---------- */
+  var TYPES = { customer:"Customer", order:"Order", product:"Product", material:"Material", supplier:"Supplier", machine:"Machine or step", logistics:"Logistics", document:"Document", event:"Risk event" };
+  var COLS = ["Outside and risks","Tier 1 suppliers","Materials","Processes","Products","Orders","Shipping and papers","Customers"];
+  var N = [
+    { id:"rain", type:"event", label:"Rain, Erode", sub:"Forecast, 3 days", col:0, y:40, attrs:{ "Kind":"Weather", "Where":"Erode", "Source":"Weather feed (sample)", "Affects":"Cotton trader" } },
+    { id:"cotton", type:"supplier", label:"Cotton trader", sub:"Tier 2, inferred", col:0, y:140, inferred:true, attrs:{ "Tier":"2", "Where":"Erode", "Known from":"3 of Ravi's emails", "Confirmed":"No" } },
+    { id:"elmaker", type:"supplier", label:"Elastane maker", sub:"Tier 2, overseas", col:0, y:300, attrs:{ "Tier":"2", "Where":"Overseas", "Known from":"Shipping record" } },
+    { id:"maint", type:"event", label:"Maintenance", sub:"Jul 15 to 25", col:0, y:470, attrs:{ "Kind":"Planned downtime", "Effect":"2 knitting machines out", "Source":"Owner" } },
+    { id:"ravi", type:"supplier", label:"Ravi Spinning", sub:"Tier 1, yarn", col:1, y:120, attrs:{ "Supplies":"Cotton yarn", "Reliability":"Usually 6 days late", "Channel":"Voice notes, Tamil", "Open orders":"3 of 3" } },
+    { id:"trader", type:"supplier", label:"Chennai trader", sub:"Tier 1, elastane", col:1, y:290, attrs:{ "Supplies":"Elastane", "Reliability":"On time", "Channel":"Email", "Open orders":"3 of 3" } },
+    { id:"sri", type:"supplier", label:"Sri Print", sub:"Tier 1, labels", col:1, y:420, attrs:{ "Supplies":"Labels, cartons", "Reliability":"Often silent", "Channel":"Phone call", "Open orders":"3 of 3" } },
+    { id:"yarn", type:"material", label:"Cotton yarn", sub:"5,000 kg per order", col:2, y:100, attrs:{ "On hand":"1,200 kg", "Alternate supplier":"None recorded" } },
+    { id:"elast", type:"material", label:"Elastane", sub:"150 kg", col:2, y:230, attrs:{ "On hand":"40 kg", "Alternate supplier":"None recorded" } },
+    { id:"label", type:"material", label:"Labels", sub:"45,000 pcs", col:2, y:360, attrs:{ "On hand":"8,000 pcs", "Alternate supplier":"None recorded" } },
+    { id:"carton", type:"material", label:"Cartons", sub:"3,750 pcs", col:2, y:440, attrs:{ "On hand":"500 pcs", "Spare":"None", "Alternate supplier":"None recorded" } },
+    { id:"dye", type:"supplier", label:"Dye house", sub:"Outside, batches", col:3, y:60, attrs:{ "Batch days":"Jun 28, Jul 7, Jul 16, Jul 25", "Takes":"5 days", "Missing a batch":"Adds 9 days" } },
+    { id:"K", type:"machine", label:"Knitting", sub:"12 machines", col:3, y:160, attrs:{ "Rate":"350 pairs per machine a day", "Capacity":"4,200 a day", "Limit of the plant":"Yes", "Downtime":"2 machines Jul 15 to 25" } },
+    { id:"L", type:"machine", label:"Toe closing", sub:"6 machines", col:3, y:240, attrs:{ "Rate":"800 per machine a day", "Capacity":"4,800 a day" } },
+    { id:"B", type:"machine", label:"Boarding", sub:"2 lines", col:3, y:320, attrs:{ "Rate":"2,500 per line a day", "Capacity":"5,000 a day" } },
+    { id:"PQ", type:"machine", label:"Pairing, QC", sub:"30 people", col:3, y:400, attrs:{ "Rate":"200 per person a day", "Capacity":"6,000 a day" } },
+    { id:"PK", type:"machine", label:"Packing", sub:"13 stations", col:3, y:480, attrs:{ "Rate":"500 per station a day", "Capacity":"6,500 a day" } },
+    { id:"P1", type:"product", label:"Sports socks", sub:"Cotton blend", col:4, y:190, attrs:{ "Yarn":"90 g a pair", "Elastane":"3 g a pair", "Carton":"12 pairs" } },
+    { id:"P2", type:"product", label:"Ankle socks", sub:"Plain cotton", col:4, y:380, attrs:{ "Yarn":"60 g a pair", "Elastane":"2 g a pair", "Carton":"24 pairs" } },
+    { id:"SO-1182", type:"order", label:"SO-1182", sub:"", col:5, y:110, attrs:{ "Customer":"US retailer", "Quantity":"50,000 pairs", "Ship by":"Jul 20", "Status":"Booked" } },
+    { id:"SO-1195", type:"order", label:"SO-1195", sub:"", col:5, y:260, attrs:{ "Customer":"European retailer", "Quantity":"30,000 pairs", "Ship by":"Jul 28", "Status":"New request" } },
+    { id:"SO-1190", type:"order", label:"SO-1190", sub:"", col:5, y:400, attrs:{ "Customer":"Gulf distributor", "Quantity":"20,000 pairs", "Ship by":"Aug 12", "Status":"Booked" } },
+    { id:"fwd", type:"logistics", label:"Forwarder", sub:"Booking agent", col:6, y:40, attrs:{ "Role":"Books the vessel", "Channel":"WhatsApp (sample)" } },
+    { id:"vessel", type:"logistics", label:"Vessel Jul 20", sub:"Booked", col:6, y:100, attrs:{ "Departs":"Jul 20", "Transit":"About 35 days", "Gate-in cut-off":"Jul 17 (sample)" } },
+    { id:"po", type:"document", label:"PO 5521", sub:"Received", col:6, y:170, attrs:{ "For":"SO-1182", "Status":"Received", "Read by":"Document reader" } },
+    { id:"inv", type:"document", label:"Invoice", sub:"Draft", col:6, y:225, attrs:{ "For":"SO-1182", "Status":"Draft", "Due":"Before gate-in" } },
+    { id:"pl", type:"document", label:"Packing list", sub:"Missing", col:6, y:280, attrs:{ "For":"SO-1182", "Status":"Missing", "Due":"Before gate-in" } },
+    { id:"C1", type:"customer", label:"US retailer", sub:"Net 30", col:7, y:100, attrs:{ "Orders":"SO-1182", "Payment":"30 days after delivery" } },
+    { id:"C3", type:"customer", label:"EU retailer", sub:"New", col:7, y:260, attrs:{ "Orders":"SO-1195", "Payment":"Not stated" } },
+    { id:"C2", type:"customer", label:"Gulf buyer", sub:"30% advance", col:7, y:400, attrs:{ "Orders":"SO-1190", "Payment":"30% advance" } }
+  ];
+  var E = [
+    ["cotton","ravi","supplies",1], ["elmaker","trader","supplies"], ["rain","cotton","affects"], ["maint","K","affects"],
+    ["ravi","yarn","supplies"], ["trader","elast","supplies"], ["sri","label","supplies"], ["sri","carton","supplies"],
+    ["yarn","dye","goes to"], ["dye","K","dyed yarn to"], ["elast","K","used in"], ["K","L","next"], ["L","B","next"], ["B","PQ","next"], ["PQ","PK","next"],
+    ["label","PK","used in"], ["carton","PK","used in"], ["PK","P1","makes"], ["PK","P2","makes"],
+    ["P1","SO-1182","fills"], ["P1","SO-1195","fills"], ["P2","SO-1190","fills"],
+    ["SO-1182","fwd","handed to"], ["fwd","vessel","books"], ["vessel","C1","delivers to"],
+    ["SO-1182","po","defined by"], ["SO-1182","inv","needs"], ["SO-1182","pl","needs"],
+    ["SO-1195","C3","for"], ["SO-1190","C2","for"]
+  ];
+  var byId = {}; N.forEach(function (n) { byId[n.id] = n; });
+  var out = {}, inn = {}; N.forEach(function (n) { out[n.id] = []; inn[n.id] = []; });
+  E.forEach(function (e, i) { out[e[0]].push({ to:e[1], i:i }); inn[e[1]].push({ to:e[0], i:i }); });
+
+  function walk(start, adj) { var seen = {}, prev = {}, q = [start]; seen[start] = true; while (q.length) { var c = q.shift(); adj[c].forEach(function (x) { if (!seen[x.to]) { seen[x.to] = true; prev[x.to] = { from:c, edge:x.i }; q.push(x.to); } }); } return { seen:seen, prev:prev }; }
+  function pathNodes(prev, start, target) { var p = [target], c = target; while (c !== start && prev[c]) { c = prev[c].from; p.unshift(c); } return p; }
+
+  /* ---------- state ---------- */
+  var state = { sel:null, hl:null, hlEdges:null, yd:0, second:false, down:false, filter:{}, answer:null };
+  Object.keys(TYPES).forEach(function (t) { state.filter[t] = true; });
+  function flags() { return { yd:state.yd, second:state.second, down:DOWN0.concat(state.down ? [{ step:"knit", from:D(7,3), to:D(7,10), n:2 }] : []) }; }
+  var BASE = computeAll({ yd:0, second:false, down:DOWN0 });
+  function sim() { return computeAll(flags()); }
+  function ostat(r) { return r.slack >= 2 ? "ok" : r.slack >= 0 ? "warn" : "risk"; }
+  function simSources() { var s = []; if (state.yd > 0) s.push("ravi"); if (state.down || state.second) s.push("K"); return s; }
+  function ringFor(id, res) {
+    if (byId[id].type === "order") return ostat(res[id]);
+    var srcs = simSources(); if (!srcs.length) return base0(id);
+    var hit = false; srcs.forEach(function (s) { if (walk(s, out).seen[id]) hit = true; });
+    if (!hit) return base0(id);
+    var changed = Object.keys(res).some(function (k) { return res[k].ready !== BASE[k].ready; });
+    var late = Object.keys(res).some(function (k) { return res[k].slack < 0; });
+    return !changed ? base0(id) : late ? "risk" : "warn";
+  }
+  function base0(id) { return { ravi:"warn", sri:"warn", rain:"warn", maint:"warn", pl:"risk", inv:"warn", carton:"warn" }[id] || ""; }
+
+  /* ---------- drawing ---------- */
+  var W = 124, H = 46, CW = 144, X0 = 10, TOP = 30;
+  function pos(n) { return { x:X0 + n.col * CW, y:TOP + n.y }; }
+  function edgePath(a, b) {
+    var pa = pos(a), pb = pos(b), x1, y1, x2, y2;
+    if (a.col === b.col) { var down = pb.y > pa.y; x1 = pa.x + W / 2; y1 = pa.y + (down ? H : 0); x2 = pb.x + W / 2; y2 = pb.y + (down ? 0 : H); return "M" + x1 + " " + y1 + " L" + x2 + " " + y2; }
+    x1 = pa.x + W; y1 = pa.y + H / 2; x2 = pb.x; y2 = pb.y + H / 2; var dx = Math.max(24, (x2 - x1) / 2);
+    return "M" + x1 + " " + y1 + " C" + (x1 + dx) + " " + y1 + " " + (x2 - dx) + " " + y2 + " " + x2 + " " + y2;
+  }
+  function draw() {
+    var res = sim(), svg = $("#svg"), height = TOP + 540, width = X0 * 2 + 8 * CW - (CW - W);
+    svg.setAttribute("viewBox", "0 0 " + width + " " + height);
+    var s = "";
+    COLS.forEach(function (c, i) { s += '<text class="colhead" x="' + (X0 + i * CW) + '" y="16">' + esc(c) + "</text>"; });
+    var hl = state.hl, srcs = simSources(), flow = {};
+    srcs.forEach(function (sx) { var w = walk(sx, out); Object.keys(w.prev).forEach(function (k) { flow[w.prev[k].edge] = true; }); });
+    var lateAny = Object.keys(res).some(function (k) { return res[k].slack < 0; }) && Object.keys(res).some(function (k) { return res[k].ready !== BASE[k].ready; });
+    E.forEach(function (e, i) {
+      var a = byId[e[0]], b = byId[e[1]], vis = state.filter[a.type] && state.filter[b.type];
+      var on = hl ? (hl[e[0]] && hl[e[1]] && (!state.hlEdges || state.hlEdges[i])) : false;
+      var cls = "edge" + (e[3] ? " inf" : "") + (on ? " hl" : "") + (!on && flow[i] && lateAny ? " risk" : "") + (hl && !on ? " dim" : "") + (!vis ? " dim" : "");
+      s += '<path class="' + cls + '" d="' + edgePath(a, b) + '"><title>' + esc(a.label + " " + e[2] + " " + b.label) + "</title></path>";
+    });
+    N.forEach(function (n) {
+      var p = pos(n), ring = ringFor(n.id, res), vis = state.filter[n.type], dim = (hl && !hl[n.id]) || !vis;
+      var sub = n.sub;
+      if (n.type === "order") sub = "Ready " + fmt(res[n.id].ready) + " · " + (res[n.id].slack >= 0 ? "+" : "") + res[n.id].slack + " d";
+      s += '<g class="gn tp-' + n.type + (n.inferred ? " inferred" : "") + (n.type === "event" ? " ev" : "") + (state.sel === n.id ? " sel" : "") + (dim ? " dim" : "") + '" data-id="' + n.id + '" tabindex="0" role="button" aria-label="' + esc(TYPES[n.type] + ": " + n.label + (sub ? ", " + sub : "")) + '" transform="translate(' + p.x + " " + p.y + ')">' +
+        '<rect class="body" width="' + W + '" height="' + H + '" rx="8"/><rect class="bar" x="0" y="0" width="6" height="' + H + '" rx="3"/>' +
+        (ring ? '<rect class="ring ' + ring + '" x="-2" y="-2" width="' + (W + 4) + '" height="' + (H + 4) + '" rx="10"/>' : "") +
+        '<text class="name" x="14" y="20">' + esc(n.label) + '</text><text class="sub" x="14" y="35">' + esc(sub) + "</text></g>";
+    });
+    svg.innerHTML = s;
+    svg.querySelectorAll(".gn").forEach(function (g) {
+      g.addEventListener("click", function () { select(g.getAttribute("data-id")); });
+      g.addEventListener("keydown", function (e) { if (e.key === "Enter" || e.key === " ") { e.preventDefault(); select(g.getAttribute("data-id")); } });
+    });
+    renderStats(res); renderInspector(res);
+  }
+  function renderStats(res) {
+    var lateN = Object.keys(res).filter(function (k) { return res[k].slack < 0; }).length;
+    $("#stats").innerHTML = '<span class="pill"><b>' + N.length + "</b> nodes</span><span class=\"pill\"><b>" + E.length + "</b> relations</span><span class=\"pill\"><b>" + Object.keys(TYPES).length + "</b> kinds of thing</span><span class=\"pill\">Orders that miss their date: <b>" + lateN + " of 3</b></span>";
+    var n = [];
+    if (state.yd) n.push("Yarn " + plural(state.yd) + " late"); if (state.down) n.push("2 machines down"); if (state.second) n.push("second shift");
+    $("#simnote").textContent = n.length ? "Scenario: " + n.join(", ") + "." : "Showing the base plan.";
+  }
+
+  /* ---------- inspector ---------- */
+  function chips(list) { return list.length ? '<div class="rel">' + list.map(function (id) { return '<button type="button" data-go="' + id + '">' + esc(byId[id].label) + "</button>"; }).join("") + "</div>" : '<p class="muted">None</p>'; }
+  function renderInspector(res) {
+    var el = $("#inspect");
+    if (!state.sel) { el.innerHTML = "<h2>Inspector</h2><p class=\"muted\" style=\"margin-top:6px\">Select a node to see its facts and how it connects.</p>"; return; }
+    var n = byId[state.sel], ring = ringFor(n.id, res), up = inn[n.id].map(function (x) { return x.to; }), dn = out[n.id].map(function (x) { return x.to; });
+    var h = '<div class="row"><h2><span class="tt" style="background:var(--t-' + n.type + ')"></span>' + esc(n.label) + '</h2><span class="chip idle">' + TYPES[n.type] + "</span>" + (ring ? '<span class="chip ' + ring + '">' + (ring === "ok" ? "Can be met" : ring === "warn" ? "Tight or exposed" : "Will be missed") + "</span>" : "") + (n.inferred ? '<span class="chip acc">Inferred</span>' : "") + "</div>";
+    var attrs = Object.keys(n.attrs).map(function (k) { return "<dt>" + esc(k) + "</dt><dd>" + esc(n.attrs[k]) + "</dd>"; }).join("");
+    if (n.type === "order") { var r = res[n.id], b = BASE[n.id]; attrs += "<dt>Ready to ship</dt><dd>" + fmt(r.ready) + (r.ready !== b.ready ? " (was " + fmt(b.ready) + ")" : "") + "</dd><dt>Buffer</dt><dd>" + (r.slack >= 0 ? plural(r.slack) : plural(-r.slack) + " late") + "</dd><dt>Knitting</dt><dd>" + fmt(r.steps.knit.start) + " to " + fmt(r.steps.knit.finish) + "</dd>"; }
+    h += '<dl class="kv">' + attrs + "</dl>";
+    h += '<div class="sub2">Depends on</div>' + chips(up) + '<div class="sub2">Feeds</div>' + chips(dn);
+    h += '<div class="row" style="margin-top:10px"><button class="btn small" id="tup" type="button">Trace upstream</button><button class="btn small" id="tdn" type="button">Trace downstream</button><button class="btn small" id="clr" type="button">Clear</button></div>';
+    el.innerHTML = h;
+    el.querySelectorAll("[data-go]").forEach(function (b) { b.addEventListener("click", function () { select(b.getAttribute("data-go")); }); });
+    $("#tup").addEventListener("click", function () { trace(n.id, "up"); }); $("#tdn").addEventListener("click", function () { trace(n.id, "down"); }); $("#clr").addEventListener("click", clearAll);
+  }
+  function select(id) { state.sel = id; var hl = {}; hl[id] = true; inn[id].forEach(function (x) { hl[x.to] = true; }); out[id].forEach(function (x) { hl[x.to] = true; }); state.hl = hl; state.hlEdges = null; draw(); }
+  function clearAll() { state.sel = null; state.hl = null; state.hlEdges = null; setAnswer(null); draw(); }
+  function trace(id, dir) {
+    var w = walk(id, dir === "up" ? inn : out), hl = w.seen, names = Object.keys(hl).filter(function (k) { return k !== id; });
+    state.sel = id; state.hl = hl; state.hlEdges = null; draw();
+    var orders = names.filter(function (k) { return byId[k].type === "order"; });
+    setAnswer("<b>" + esc(byId[id].label) + (dir === "up" ? " depends on " : " feeds ") + names.length + " other things.</b>" + (orders.length ? " Orders reached: " + orders.join(", ") + "." : "") + "<ul>" + names.slice(0, 8).map(function (k) { return "<li>" + esc(byId[k].label) + " (" + TYPES[byId[k].type].toLowerCase() + ")</li>"; }).join("") + (names.length > 8 ? "<li>and " + (names.length - 8) + " more</li>" : "") + "</ul>");
+  }
+  function setAnswer(html) { $("#answer").innerHTML = html || '<p class="muted">Pick a question, or select a node and trace what it feeds or depends on.</p>'; }
+
+  /* ---------- questions the graph can answer ---------- */
+  function highlightPaths(start, prev, targets) { var hl = {}, he = {}; hl[start] = true; targets.forEach(function (t) { var c = t; while (c !== start && prev[c]) { hl[c] = true; he[prev[c].edge] = true; c = prev[c].from; } hl[c] = true; }); state.hl = hl; state.hlEdges = he; }
+  var QUESTIONS = [
+    { q:"Which orders depend on Ravi Spinning?", run:function (res) {
+      var w = walk("ravi", out), orders = Object.keys(w.seen).filter(function (k) { return byId[k].type === "order"; });
+      state.sel = "ravi"; highlightPaths("ravi", w.prev, orders); draw();
+      return "<b>" + orders.length + " of 3 open orders depend on Ravi.</b><ul>" + orders.map(function (o) { return "<li>" + o + ": ready " + fmt(res[o].ready) + ", " + (res[o].slack >= 0 ? plural(res[o].slack) + " of buffer" : plural(-res[o].slack) + " late") + "</li>"; }).join("") + "</ul>Path to SO-1182: " + pathNodes(w.prev, "ravi", "SO-1182").map(function (k) { return byId[k].label; }).join(" > ") + "."; } },
+    { q:"Who is behind Ravi?", run:function () {
+      var w = walk("ravi", inn), names = Object.keys(w.seen).filter(function (k) { return k !== "ravi"; });
+      state.sel = "ravi"; highlightPaths("ravi", w.prev, names); draw();
+      return "<b>Behind Ravi: " + names.map(function (k) { return byId[k].label; }).join(", ") + ".</b><ul><li>The cotton trader in Erode was never named. The app inferred it from 3 of Ravi's emails.</li><li>A rain forecast is attached to that trader, so Ravi's yarn is exposed to it.</li></ul>"; } },
+    { q:"What is exposed to the Jul 15 to 25 maintenance?", run:function (res) {
+      var w = walk("maint", out), orders = Object.keys(w.seen).filter(function (k) { return byId[k].type === "order"; });
+      state.sel = "maint"; highlightPaths("maint", w.prev, orders); draw();
+      var hit = orders.filter(function (o) { return res[o].steps.knit.start <= D(7,25) && res[o].steps.knit.finish >= D(7,15); });
+      return "<b>Knitting loses 2 machines, from 4,200 to 3,500 pairs a day.</b><ul>" + orders.map(function (o) { return "<li>" + o + ": knits " + fmt(res[o].steps.knit.start) + " to " + fmt(res[o].steps.knit.finish) + (hit.indexOf(o) >= 0 ? ", overlaps the maintenance" : ", clear of it") + "</li>"; }).join("") + "</ul>"; } },
+    { q:"What does SO-1195 depend on?", run:function (res) {
+      var w = walk("SO-1195", inn), names = Object.keys(w.seen).filter(function (k) { return k !== "SO-1195"; });
+      state.sel = "SO-1195"; state.hl = w.seen; state.hlEdges = null; draw();
+      var risky = names.filter(function (k) { return ringFor(k, res); });
+      return "<b>SO-1195 depends on " + names.length + " things.</b> Ready " + fmt(res["SO-1195"].ready) + " against " + fmt(ORD["SO-1195"].shipBy) + ".<ul>" + risky.slice(0, 6).map(function (k) { return "<li>" + esc(byId[k].label) + ": " + (ringFor(k, res) === "risk" ? "problem" : "watch") + "</li>"; }).join("") + "</ul>"; } },
+    { q:"Which materials have only one supplier?", run:function () {
+      var mats = N.filter(function (n) { return n.type === "material"; }), one = mats.filter(function (m) { return inn[m.id].filter(function (x) { return byId[x.to].type === "supplier"; }).length === 1; });
+      var hl = {}; one.forEach(function (m) { hl[m.id] = true; inn[m.id].forEach(function (x) { hl[x.to] = true; }); }); state.sel = null; state.hl = hl; state.hlEdges = null; draw();
+      return "<b>" + one.length + " of " + mats.length + " materials have a single supplier and no recorded alternative.</b><ul>" + one.map(function (m) { return "<li>" + esc(m.label) + " from " + esc(byId[inn[m.id][0].to].label) + "</li>"; }).join("") + "</ul>Any one of them stopping would stop every open order."; } }
+  ];
+  function buildQuestions() {
+    $("#qs").innerHTML = QUESTIONS.map(function (q, i) { return '<button class="btn" type="button" data-q="' + i + '">' + esc(q.q) + "</button>"; }).join("");
+    $("#qs").querySelectorAll("[data-q]").forEach(function (b) { b.addEventListener("click", function () { var res = sim(); var html = QUESTIONS[+b.getAttribute("data-q")].run(res); setAnswer(html); }); });
+  }
+  function buildFilters() {
+    $("#filters").innerHTML = Object.keys(TYPES).map(function (t) { return '<button type="button" class="fchip" data-t="' + t + '" aria-pressed="' + state.filter[t] + '"><i style="background:var(--t-' + t + ')"></i>' + TYPES[t] + "</button>"; }).join("");
+    $("#filters").querySelectorAll("[data-t]").forEach(function (b) { b.addEventListener("click", function () { var t = b.getAttribute("data-t"); state.filter[t] = !state.filter[t]; b.setAttribute("aria-pressed", state.filter[t]); draw(); }); });
+  }
+
+  $("#yd").addEventListener("input", function (e) { state.yd = +e.target.value; $("#ydv").textContent = plural(state.yd); draw(); });
+  $("#down").addEventListener("change", function (e) { state.down = e.target.checked; draw(); });
+  $("#second").addEventListener("change", function (e) { state.second = e.target.checked; draw(); });
+  $("#reset").addEventListener("click", function () { state.yd = 0; state.down = false; state.second = false; $("#yd").value = 0; $("#ydv").textContent = "0 days"; $("#down").checked = false; $("#second").checked = false; clearAll(); });
+
+  buildFilters(); buildQuestions(); draw();
+})();
+</script>

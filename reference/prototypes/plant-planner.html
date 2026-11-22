@@ -1,0 +1,584 @@
+<title>Plant Planner Prototype</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600&family=Space+Grotesk:wght@500;700&display=swap">
+<style>
+  /* Layout concept: three work areas (Process, Orders, Production GPT) in one shell.
+     Indigo marks the order being looked at and every action. Red, amber and green mean only one thing: can the date be met. */
+  :root {
+    --bg: #eef1f6; --surface: #ffffff; --ink: #161c2e; --muted: #566079; --line: #d3d9e4; --fill: #e6eaf2;
+    --accent: #27348b; --on-accent: #ffffff; --accent-soft: #e3e7fb; --other: #b9c1d1;
+    --ok: #17694a; --ok-bg: #dff3e8; --warn: #8a5200; --warn-bg: #fdeccb; --risk: #b3261e; --risk-bg: #fbe5e2;
+    --idle: #566079; --idle-bg: #e6eaf2;
+    --display: "Space Grotesk", "Inter", system-ui, sans-serif;
+    --sans: "Inter", system-ui, -apple-system, "Segoe UI", sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #0f1320; --surface: #181e2f; --ink: #e8ebf4; --muted: #9aa4bd; --line: #2e3650; --fill: #222a40;
+      --accent: #9db0ff; --on-accent: #0f1630; --accent-soft: #232d57; --other: #475170;
+      --ok: #6fd0a0; --ok-bg: #14302a; --warn: #f2b45a; --warn-bg: #34270f; --risk: #ff9c90; --risk-bg: #3b1f1d;
+      --idle: #9aa4bd; --idle-bg: #222a40; color-scheme: dark;
+    }
+  }
+  :root[data-theme="dark"] {
+    --bg: #0f1320; --surface: #181e2f; --ink: #e8ebf4; --muted: #9aa4bd; --line: #2e3650; --fill: #222a40;
+    --accent: #9db0ff; --on-accent: #0f1630; --accent-soft: #232d57; --other: #475170;
+    --ok: #6fd0a0; --ok-bg: #14302a; --warn: #f2b45a; --warn-bg: #34270f; --risk: #ff9c90; --risk-bg: #3b1f1d;
+    --idle: #9aa4bd; --idle-bg: #222a40; color-scheme: dark;
+  }
+
+  * { box-sizing: border-box; }
+  [hidden] { display: none !important; }
+  body {
+    background: var(--bg); color: var(--ink); font-family: var(--sans); font-size: 14px; line-height: 1.45; margin: 0;
+    padding-block: 18px 30px;
+    padding-left: max(16px, env(safe-area-inset-left, 0px));
+    padding-right: max(16px, env(safe-area-inset-right, 0px));
+  }
+  .wrap { max-width: 1280px; margin: 0 auto; }
+  h1, h2, h3, h4 { font-family: var(--display); margin: 0; letter-spacing: -0.01em; }
+  h1 { font-size: 20px; } h2 { font-size: 17px; } h3 { font-size: 14px; }
+  p { margin: 0; }
+  .muted { color: var(--muted); }
+  .num { font-variant-numeric: tabular-nums; }
+  button { font: inherit; color: inherit; }
+
+  .shell { display: grid; grid-template-columns: 200px minmax(0, 1fr); background: var(--surface); border: 1px solid var(--line); border-radius: 14px; overflow: hidden; height: min(940px, calc(100vh - 36px)); min-height: 640px; }
+  .side { border-right: 1px solid var(--line); padding: 14px 10px; display: flex; flex-direction: column; gap: 4px; background: color-mix(in srgb, var(--fill) 55%, var(--surface)); }
+  .brand { display: flex; align-items: center; gap: 8px; padding: 4px 8px 14px; font-family: var(--display); font-weight: 700; }
+  .mark { width: 26px; height: 26px; border-radius: 7px; background: var(--accent); flex: none; position: relative; }
+  .mark::after { content: ""; position: absolute; left: 7px; top: 7px; width: 12px; height: 12px; border: 2px solid var(--on-accent); border-radius: 50%; }
+  .navbtn { display: flex; align-items: center; gap: 10px; width: 100%; text-align: left; padding: 8px 10px; border: 0; border-radius: 8px; background: transparent; color: var(--muted); font-weight: 500; cursor: pointer; }
+  .navbtn svg { width: 18px; height: 18px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; flex: none; }
+  .navbtn[aria-current="page"] { background: var(--surface); color: var(--ink); font-weight: 600; box-shadow: 0 0 0 1px var(--line); }
+  .badge { margin-left: auto; font-size: 11px; font-weight: 700; background: var(--accent-soft); color: var(--accent); border-radius: 999px; padding: 1px 7px; }
+  .side-foot { margin-top: auto; padding: 8px; color: var(--muted); font-size: 12px; }
+  .mainwrap { display: flex; flex-direction: column; min-width: 0; min-height: 0; }
+  .bar { display: flex; align-items: center; gap: 10px; padding: 10px 16px; border-bottom: 1px solid var(--line); }
+  .bar h1 { margin-right: auto; }
+  .avatar { width: 30px; height: 30px; border-radius: 50%; background: var(--accent-soft); color: var(--accent); display: grid; place-items: center; font-weight: 700; flex: none; }
+  main { flex: 1; overflow-y: auto; padding: 16px; min-height: 0; }
+
+  .btn { border: 1px solid var(--line); background: var(--surface); border-radius: 8px; padding: 6px 12px; font-weight: 600; cursor: pointer; }
+  .btn.primary { background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .btn.small { padding: 4px 10px; font-size: 12px; }
+  .btn[disabled] { opacity: 0.65; cursor: default; }
+  .btn:focus-visible, .navbtn:focus-visible, .row-link:focus-visible, input:focus-visible, textarea:focus-visible, summary:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+  .chip { display: inline-block; font-size: 12px; font-weight: 600; padding: 2px 8px; border-radius: 999px; white-space: nowrap; }
+  .chip.ok { background: var(--ok-bg); color: var(--ok); } .chip.warn { background: var(--warn-bg); color: var(--warn); }
+  .chip.risk { background: var(--risk-bg); color: var(--risk); } .chip.idle { background: var(--idle-bg); color: var(--idle); }
+  .chip.acc { background: var(--accent-soft); color: var(--accent); }
+  .card { border: 1px solid var(--line); border-radius: 12px; background: var(--surface); padding: 14px; min-width: 0; }
+  .stack-v { display: flex; flex-direction: column; gap: 14px; }
+  .row { display: flex; gap: 8px; align-items: center; flex-wrap: wrap; }
+  .actions { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+  .sect { display: flex; align-items: center; gap: 8px; font-family: var(--display); font-weight: 700; font-size: 15px; }
+  .sect .step { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 12px; background: var(--accent); color: var(--on-accent); flex: none; }
+  .sect .step.pending { background: var(--fill); color: var(--muted); }
+  table { border-collapse: collapse; width: 100%; }
+  th { text-align: left; font-size: 12px; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); font-weight: 600; padding: 6px 10px; border-bottom: 1px solid var(--line); white-space: nowrap; }
+  td { padding: 8px 10px; border-bottom: 1px solid var(--line); vertical-align: top; }
+  tr:last-child td { border-bottom: 0; }
+  .r { text-align: right; }
+  .nw { white-space: nowrap; }
+  .tablewrap { overflow-x: auto; }
+  .tablewrap table { min-width: 560px; }
+  .grid2 { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 14px; }
+  .stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 10px; }
+  .stat small { display: block; color: var(--muted); font-weight: 500; }
+  .stat strong { display: block; font-family: var(--display); font-size: 19px; margin: 2px 0; }
+  .stat .sub { color: var(--muted); font-size: 12px; }
+  .progress { display: flex; gap: 8px; flex-wrap: wrap; }
+  .progress .chip { padding: 4px 10px; }
+  .pulse { animation: pulse 1s ease-in-out infinite; }
+  @keyframes pulse { 50% { opacity: 0.5; } }
+
+  /* process */
+  textarea { width: 100%; min-height: 130px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 10px; resize: vertical; }
+  .flow { display: grid; grid-template-columns: repeat(auto-fit, minmax(112px, 1fr)); gap: 8px; align-items: stretch; }
+  .fnode { min-width: 0; border: 1px solid var(--line); border-radius: 10px; padding: 8px 10px; background: var(--surface); position: relative; }
+  .fnode b { display: block; font-size: 13px; } .fnode .s { display: block; color: var(--muted); font-size: 12px; }
+  .fnode .cap { display: block; margin-top: 4px; font-weight: 600; font-size: 12.5px; }
+  .fnode.bn { border-color: var(--warn); background: color-mix(in srgb, var(--warn-bg) 50%, var(--surface)); }
+  .fnode.ext { border-style: dashed; }
+  .num-in { width: 76px; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 6px; padding: 4px 6px; text-align: right; }
+  .qs { margin: 6px 0 0; padding-left: 18px; } .qs li { margin-bottom: 4px; }
+
+  /* orders */
+  .row-link { width: 100%; text-align: left; background: var(--surface); border: 1px solid var(--line); border-radius: 12px; padding: 12px 14px; cursor: pointer; display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 6px 12px; align-items: center; }
+  .crumbs { display: flex; gap: 6px; align-items: center; color: var(--muted); margin-bottom: 10px; }
+  .crumbs button { background: none; border: 0; color: var(--accent); font-weight: 600; cursor: pointer; padding: 0; }
+  .quote { margin: 0; padding: 8px 10px; border-left: 3px solid var(--line); color: var(--muted); font-style: italic; }
+  .fields { display: grid; grid-template-columns: repeat(auto-fit, minmax(190px, 1fr)); gap: 8px; margin-top: 10px; }
+  .fields div { background: var(--fill); border-radius: 8px; padding: 6px 9px; }
+  .fields small { display: block; color: var(--muted); }
+  .verdict { border-radius: 12px; padding: 12px 14px; border: 1px solid var(--line); border-left-width: 6px; }
+  .verdict.ok { border-left-color: var(--ok); background: color-mix(in srgb, var(--ok-bg) 45%, var(--surface)); }
+  .verdict.warn { border-left-color: var(--warn); background: color-mix(in srgb, var(--warn-bg) 45%, var(--surface)); }
+  .verdict.risk { border-left-color: var(--risk); background: color-mix(in srgb, var(--risk-bg) 45%, var(--surface)); }
+  .opts { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 10px; }
+  .opt { border: 1px solid var(--line); border-radius: 10px; padding: 10px; display: flex; flex-direction: column; gap: 6px; }
+  .opt.rec { border-color: var(--accent); box-shadow: 0 0 0 1px var(--accent); }
+  .opt .big { font-family: var(--display); font-size: 17px; font-weight: 700; }
+  .opt .actions { margin-top: auto; }
+  .risks { margin: 6px 0 0; padding-left: 18px; } .risks li { margin-bottom: 4px; }
+  .chartwrap { overflow-x: auto; }
+  svg.chart text { font-family: var(--sans); }
+  .chart .tick { font-size: 10px; fill: var(--muted); } .chart .rowlab { font-size: 12px; font-weight: 600; fill: var(--ink); }
+  .chart .rowsub { font-size: 10px; fill: var(--muted); } .chart .grid { stroke: var(--line); stroke-width: 1; }
+  .chart .bar-other { fill: var(--other); } .chart .bar-this { fill: var(--accent); }
+  .chart .capline { fill: none; stroke: var(--muted); stroke-width: 1.5; stroke-dasharray: 3 2; }
+  .chart .down { fill: var(--warn-bg); } .chart .dnlab { font-size: 9px; fill: var(--warn); }
+  .chart .ship { stroke: var(--ink); stroke-width: 1.5; stroke-dasharray: 4 3; } .chart .shiplab { font-size: 10px; font-weight: 600; fill: var(--ink); }
+  .chart .ready.ok { stroke: var(--ok); } .chart .ready.warn { stroke: var(--warn); } .chart .ready.risk { stroke: var(--risk); }
+  .chart .ready { stroke-width: 2; } .chart .readylab.ok { fill: var(--ok); } .chart .readylab.warn { fill: var(--warn); } .chart .readylab.risk { fill: var(--risk); } .chart .readylab { font-size: 10px; font-weight: 700; }
+  .legend { display: flex; gap: 14px; flex-wrap: wrap; color: var(--muted); font-size: 12px; margin-top: 6px; }
+  .legend i { display: inline-block; width: 10px; height: 10px; border-radius: 2px; margin-right: 5px; vertical-align: -1px; }
+  .ubar { height: 8px; border-radius: 4px; background: var(--fill); overflow: hidden; min-width: 80px; }
+  .ubar span { display: block; height: 100%; background: var(--accent); }
+  .ubar.hot span { background: var(--warn); }
+
+  /* production gpt */
+  .insights { display: grid; grid-template-columns: repeat(auto-fit, minmax(210px, 1fr)); gap: 10px; }
+  .insight { border: 1px solid var(--line); border-radius: 10px; padding: 10px 12px; background: var(--surface); }
+  .insight small { display: block; color: var(--muted); font-weight: 600; text-transform: uppercase; letter-spacing: 0.05em; font-size: 11px; }
+  .insight b { display: block; font-family: var(--display); font-size: 16px; margin: 2px 0; }
+  .chat { height: 420px; overflow-y: auto; padding: 12px; display: flex; flex-direction: column; gap: 10px; background: color-mix(in srgb, var(--fill) 40%, var(--surface)); border-radius: 10px; }
+  .msg { max-width: 92%; padding: 9px 11px; border-radius: 10px; background: var(--surface); border: 1px solid var(--line); }
+  .msg.user { align-self: flex-end; background: var(--accent); color: var(--on-accent); border-color: var(--accent); }
+  .msg details { margin-top: 8px; color: var(--muted); } .msg summary { cursor: pointer; font-weight: 600; }
+  .msg ul { margin: 6px 0 0; padding-left: 18px; }
+  .chips { display: flex; gap: 6px; flex-wrap: wrap; margin: 10px 0; }
+  .ask { display: flex; gap: 8px; }
+  .ask input { flex: 1; min-width: 0; font: inherit; color: var(--ink); background: var(--surface); border: 1px solid var(--line); border-radius: 8px; padding: 9px 10px; }
+
+  .toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(24px + env(safe-area-inset-bottom, 0px)); z-index: 80; background: var(--ink); color: var(--bg); padding: 9px 14px; border-radius: 10px; max-width: calc(100% - 32px); }
+  .bottomnav { display: none; }
+  @media (max-width: 900px) { .grid2 { grid-template-columns: minmax(0, 1fr); } }
+  @media (max-width: 760px) {
+    body { padding-bottom: calc(76px + env(safe-area-inset-bottom, 0px)); }
+    .shell { display: block; height: auto; min-height: 0; border: 0; background: transparent; border-radius: 0; overflow: visible; }
+    .side { display: none; }
+    .bar { padding: 4px 0 10px; border-bottom: 0; }
+    main { overflow: visible; padding: 0; }
+    .toast { bottom: calc(84px + env(safe-area-inset-bottom, 0px)); }
+    .bottomnav { display: flex; position: fixed; left: 0; right: 0; bottom: 0; z-index: 50; background: var(--surface); border-top: 1px solid var(--line);
+      padding: 6px max(8px, env(safe-area-inset-right, 0px)) calc(6px + env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); }
+    .bottomnav .navbtn { flex-direction: column; gap: 2px; font-size: 11px; text-align: center; padding: 6px 2px; }
+    .row-link { grid-template-columns: minmax(0, 1fr); }
+  }
+  @media (prefers-reduced-motion: reduce) { * { transition: none !important; animation: none !important; scroll-behavior: auto !important; } }
+</style>
+
+<div class="wrap">
+  <div class="shell">
+    <aside class="side" aria-label="Main navigation">
+      <div class="brand"><span class="mark" aria-hidden="true"></span>Plant Planner</div>
+      <div id="nav-side"></div>
+      <div class="side-foot">Kovai Knits<br>Sample data. Nothing is sent.</div>
+    </aside>
+    <div class="mainwrap">
+      <header class="bar"><h1 id="title">Process</h1><span class="avatar" aria-label="Meena">M</span></header>
+      <main id="main"></main>
+    </div>
+  </div>
+  <nav class="bottomnav" id="nav-bottom" aria-label="Main navigation"></nav>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite" hidden></div>
+
+<script>
+(function () {
+  var D = function (m, d) { return Math.round(Date.UTC(2027, m - 1, d) / 864e5); };
+  var MN = ["Jan","Feb","Mar","Apr","May","Jun","Jul","Aug","Sep","Oct","Nov","Dec"];
+  var fmt = function (n) { var t = new Date(n * 864e5); return MN[t.getUTCMonth()] + " " + t.getUTCDate(); };
+  var plural = function (n) { return n + (Math.abs(n) === 1 ? " day" : " days"); };
+  var f0 = function (x) { return Math.round(x).toLocaleString("en-IN"); };
+  var $ = function (s, r) { return (r || document).querySelector(s); };
+  var esc = function (s) { return String(s).replace(/[&<>"]/g, function (c) { return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); };
+
+  var SLOTS = [D(6,28), D(7,7), D(7,16), D(7,25)];
+  var proc = { knit:{ n:12, rate:350 }, link:{ n:6, rate:800 }, board:{ n:2, rate:2500 }, pair:{ n:30, rate:200 }, pack:{ n:13, rate:500 } };
+  var STEPS = [
+    { id:"knit", name:"Knitting", unit:"machines", per:"machine" },
+    { id:"link", name:"Toe closing", unit:"machines", per:"machine" },
+    { id:"board", name:"Boarding and steaming", unit:"lines", per:"line" },
+    { id:"pair", name:"Pairing and quality check", unit:"people", per:"person" },
+    { id:"pack", name:"Packing", unit:"stations", per:"station" }
+  ];
+  var DOWN0 = [{ step:"knit", from:D(7,15), to:D(7,25), n:2, why:"planned maintenance" }];
+
+  var ORDERS = [
+    { id:"SO-1182", cust:"US retailer", item:"Cotton-blend sports socks", pairs:50000, shipBy:D(7,20), yarnArr:D(6,25), g:90, el:3, perCarton:12,
+      hand:{ yarn:1200, el:40, label:8000, carton:500 }, status:"Booked", src:"PO 5521, PDF by email",
+      text:"50,000 pairs sports socks, cotton blend, 3 colours. Ship by July 20. Deliver to the US warehouse by Aug 24. 12 pairs per carton, retail labels. Payment net 30.",
+      fields:[["Product","Cotton-blend sports socks","97%"],["Quantity","50,000 pairs","99%"],["Ship by","Jul 20","96%"],["Colours","3, names not given","62%",1],["Packing","12 pairs a carton, retail labels","88%"],["Payment","Net 30","71%",1]] },
+    { id:"SO-1190", cust:"Gulf distributor", item:"Plain cotton ankle socks", pairs:20000, shipBy:D(8,12), yarnArr:D(7,3), g:60, el:2, perCarton:24,
+      hand:{ yarn:0, el:0, label:0, carton:0 }, status:"Booked", src:"Email from the distributor",
+      text:"20,000 pairs plain ankle socks, white and black. Ship by 12 August. 24 pairs per carton. 30% advance, balance on shipping documents.",
+      fields:[["Product","Plain cotton ankle socks","95%"],["Quantity","20,000 pairs","99%"],["Ship by","Aug 12","94%"],["Colours","White and black","97%"],["Packing","24 pairs a carton","90%"],["Payment","30% advance","83%"]] },
+    { id:"SO-1195", cust:"European retailer", item:"Cotton-blend sports socks", pairs:30000, shipBy:D(7,28), yarnArr:D(7,5), g:90, el:3, perCarton:12,
+      hand:{ yarn:0, el:0, label:0, carton:0 }, status:"New request", src:"Email from the European retailer",
+      text:"Could you make 30,000 pairs of the same cotton-blend sports sock as last time, in 4 colours, shipped by 28 July? Cartons of 12 with EU labels. Please confirm by Friday.",
+      fields:[["Product","Cotton-blend sports socks (same as SO-1182)","91%"],["Quantity","30,000 pairs","98%"],["Ship by","Jul 28","93%"],["Colours","4, names not given","58%",1],["Packing","12 pairs a carton, EU labels","85%"],["Reply needed","By Friday","90%"]] }
+  ];
+  var byId = function (id) { return ORDERS.filter(function (o) { return o.id === id; })[0]; };
+
+  var state = { view:"process", order:null, second:false, prio:false, booked:{}, analyzed:{}, stage:3, gpt:[], confirmed:{}, reading:false };
+
+  /* ---------- engine ---------- */
+  function flags(extra) { var fl = { second:state.second, prio:state.prio, down:DOWN0.slice() }; if (extra) for (var k in extra) fl[k] = extra[k]; return fl; }
+  function cap(id, d, fl) {
+    var n = proc[id].n;
+    (fl.down || []).forEach(function (x) { if (x.step === id && d >= x.from && d <= x.to) n = Math.max(0, n - x.n); });
+    var c = n * proc[id].rate; if (id === "knit" && fl.second) c *= 1.5; return Math.round(c);
+  }
+  function capNominal(id, fl) { return cap(id, -99999, { second:fl.second, down:[] }); }
+  function slotFor(o) { var a = o.yarnArr + 1; for (var i = 0; i < SLOTS.length; i++) if (SLOTS[i] >= a) return SLOTS[i]; return a; }
+  function sumTo(u, upto) { var s = 0; for (var k in u) if (+k <= upto) s += u[k]; return s; }
+  function sched(o, committed, fl) {
+    var ds = slotFor(o), df = ds + 4, ks = df + 1, res = { id:o.id, dye:{ start:ds, finish:df }, steps:{} };
+    STEPS.forEach(function (st, i) {
+      var usage = {}, rem = o.pairs, done = 0, d = i === 0 ? ks : res.steps[STEPS[i - 1].id].start + 1, first = null, last = null, g = 0;
+      while (rem > 0 && g++ < 400) {
+        var free = cap(st.id, d, fl) - (committed[st.id][d] || 0);
+        var up = i === 0 ? Infinity : (sumTo(res.steps[STEPS[i - 1].id].usage, d - 1) - done);
+        var use = Math.max(0, Math.min(free, up, rem));
+        if (use > 0) { usage[d] = use; done += use; rem -= use; if (first === null) first = d; last = d; }
+        d++;
+      }
+      if (first === null) { first = d; last = d; }
+      for (var k in usage) committed[st.id][k] = (committed[st.id][k] || 0) + usage[k];
+      res.steps[st.id] = { start:first, finish:last, usage:usage, days:last - first + 1 };
+    });
+    res.ready = res.steps.pack.finish + 2; res.slack = o.shipBy - res.ready; return res;
+  }
+  function computeAll(fl) {
+    var committed = {}; STEPS.forEach(function (s) { committed[s.id] = {}; });
+    var seq = fl.prio ? ["SO-1182","SO-1195","SO-1190"] : ["SO-1182","SO-1190","SO-1195"], out = {};
+    seq.forEach(function (id) { out[id] = sched(byId(id), committed, fl); });
+    out._committed = committed; return out;
+  }
+  function verdict(r, o) {
+    var s = r.slack;
+    if (s >= 2) return { c:"ok", t:"Feasible", d:"Ready to ship " + fmt(r.ready) + ", " + plural(s) + " before the " + fmt(o.shipBy) + " deadline." };
+    if (s >= 0) return { c:"warn", t:"Feasible, tight", d:"Ready to ship " + fmt(r.ready) + (s === 0 ? ", on the day of the deadline." : ", " + plural(s) + " before the deadline.") };
+    return { c:"risk", t:"Not feasible by " + fmt(o.shipBy), d:"Earliest ready date is " + fmt(r.ready) + ", " + plural(-s) + " after the deadline." };
+  }
+  function utilOf(id, from, to, res, fl) {
+    var used = 0, capSum = 0;
+    for (var d = from; d <= to; d++) { capSum += cap(id, d, fl); for (var k in res) { if (k.charAt(0) === "_") continue; used += res[k].steps[id].usage[d] || 0; } }
+    return capSum ? used / capSum : 0;
+  }
+  function bottleneck(fl) {
+    var best = null; STEPS.forEach(function (s) { var c = capNominal(s.id, fl); if (!best || c < best.c) best = { id:s.id, name:s.name, c:c }; }); return best;
+  }
+
+  /* ---------- nav ---------- */
+  var ICONS = {
+    process: '<circle cx="5" cy="12" r="2"/><circle cx="12" cy="12" r="2"/><circle cx="19" cy="12" r="2"/><path d="M7 12h3M14 12h3"/>',
+    orders: '<path d="M6 4h12v16H6z"/><path d="M9 9h6M9 13h6M9 17h3"/>',
+    gpt: '<path d="M4 5h16v11H9l-5 4z"/><path d="M8 10h8"/>'
+  };
+  var NAV = [["process","Process"],["orders","Orders"],["gpt","Production GPT"]];
+  function navHtml() {
+    var cv = state.view === "order" ? "orders" : state.view;
+    return NAV.map(function (n) {
+      var badge = n[0] === "orders" && !state.booked["SO-1195"] ? '<span class="badge">1 new</span>' : "";
+      return '<button type="button" class="navbtn" data-act="go" data-v="' + n[0] + '"' + (cv === n[0] ? ' aria-current="page"' : "") + '><svg viewBox="0 0 24 24" aria-hidden="true">' + ICONS[n[0]] + "</svg>" + n[1] + badge + "</button>";
+    }).join("");
+  }
+
+  /* ---------- PROCESS ---------- */
+  var PROC_TEXT = "We buy cotton yarn and elastane. Yarn goes to an outside dye house that runs batches on fixed days and takes 5 days. We knit on 12 machines, about 350 pairs a day each. Toes are closed on 6 machines, about 800 pairs a day each. Then boarding and steaming on 2 lines, pairing and checking by 30 people, and packing at 13 stations. Cartons hold 12 pairs. Each pair uses about 90 g of yarn, with 10% waste.";
+  function viewProcess() {
+    var fl = flags(), bn = bottleneck(fl), total = capNominal(bn.id, fl);
+    var flow = '<div class="fnode ext"><b>Buy materials</b><span class="s">Ravi Spinning, Chennai trader</span><span class="cap">Lead times vary</span></div>' +
+      '<div class="fnode ext"><b>Yarn dyeing</b><span class="s">Outside dye house</span><span class="cap">5 days, fixed batch days</span></div>';
+    STEPS.forEach(function (s) { var c = capNominal(s.id, fl);
+      flow += '<div class="fnode' + (s.id === bn.id ? " bn" : "") + '"><b>' + s.name + '</b><span class="s">' + proc[s.id].n + " " + s.unit + '</span><span class="cap num">' + f0(c) + " pairs a day" + (s.id === bn.id ? " · limit" : "") + "</span></div>"; });
+    flow += '<div class="fnode ext"><b>Dispatch</b><span class="s">Truck, port paperwork</span><span class="cap">2 days</span></div>';
+    var rows = STEPS.map(function (s) {
+      var down = DOWN0.filter(function (x) { return x.step === s.id; }).map(function (x) { return x.n + " " + s.unit + " out " + fmt(x.from) + " to " + fmt(x.to) + " (" + x.why + ")"; }).join("; ") || "None planned";
+      return "<tr><td><b>" + s.name + '</b></td><td class="nw"><input class="num-in num" type="number" min="1" data-proc="' + s.id + '" data-field="n" value="' + proc[s.id].n + '" aria-label="' + s.name + " " + s.unit + '"> ' + s.unit + '</td><td class="nw"><input class="num-in num" type="number" min="1" data-proc="' + s.id + '" data-field="rate" value="' + proc[s.id].rate + '" aria-label="' + s.name + ' pairs per ' + s.per + ' a day"> per ' + s.per + '</td><td class="r num"><b>' + f0(capNominal(s.id, fl)) + "</b></td><td>" + down + "</td></tr>";
+    }).join("");
+    var confirms = [
+      ["Do all 12 knitting machines make every style, including the cushioned sports sock?", "q1"],
+      ["Are the dye house batch days Jun 28, Jul 7, Jul 16 and Jul 25?", "q2"],
+      ["Does the second shift on knitting give 50% more output? I assumed so.", "q3"]
+    ].map(function (q) { return '<li>' + q[0] + ' <button class="btn small" data-act="confirm" data-k="' + q[1] + '"' + (state.confirmed[q[1]] ? " disabled" : "") + ">" + (state.confirmed[q[1]] ? "Confirmed" : "Confirm") + "</button></li>"; }).join("");
+    return '<div class="stack-v">' +
+      '<div><h2>How you make socks</h2><p class="muted">Describe the process in your own words. The agent turns it into a manufacturing plan that every order is checked against.</p></div>' +
+      '<div class="card"><div class="row" style="margin-bottom:8px"><span class="chip acc">Cotton-blend socks</span><span class="muted">Used by all 3 orders</span><button class="btn small" data-act="toast" data-m="In the real app you can add another process, for example for shirts.">+ Add a process</button></div>' +
+      '<label for="ptext" style="position:absolute;left:-9999px">Describe your process</label><textarea id="ptext">' + esc(PROC_TEXT) + "</textarea>" +
+      '<div class="actions"><button class="btn primary" data-act="redesign"' + (state.reading ? " disabled" : "") + ">" + (state.reading ? "Reading your description" : "Update the plan from this text") + '</button><span class="muted" style="align-self:center">' + (state.reading ? "" : "Sample text is filled in. In the real app the agent reads whatever you write.") + "</span></div>" +
+      (state.reading ? '<div class="progress" style="margin-top:10px"><span class="chip acc pulse">Finding the steps</span><span class="chip acc pulse">Finding machines and rates</span><span class="chip acc pulse">Checking what is missing</span></div>' : "") + "</div>" +
+      '<div class="card"><div class="sect">The manufacturing plan I designed</div><p class="muted" style="margin:4px 0 10px">7 steps. The slowest step is <b>' + bn.name.toLowerCase() + "</b> at " + f0(total) + " pairs a day, so that is what limits the plant.</p><div class=\"flow\">" + flow + "</div></div>" +
+      '<div class="card"><div class="sect">Machines, people and rates</div><p class="muted" style="margin:4px 0 8px">Change a number and every order check below updates.</p><div class="tablewrap"><table><thead><tr><th>Step</th><th>Machines or people</th><th>Rate</th><th class="r">Pairs a day</th><th>Planned downtime</th></tr></thead><tbody>' + rows + "</tbody></table></div>" +
+      '<label class="row" style="margin-top:10px"><input type="checkbox" data-act="flag" data-k="second"' + (state.second ? " checked" : "") + '> Run knitting with a second shift (+50%)</label></div>' +
+      '<div class="grid2"><div class="card"><div class="sect">What each pair needs</div><div class="tablewrap"><table style="min-width:0"><thead><tr><th>Material</th><th class="r">Per pair</th><th class="r">Waste</th></tr></thead><tbody><tr><td>Cotton yarn</td><td class="r num">90 g</td><td class="r num">10%</td></tr><tr><td>Elastane</td><td class="r num">3 g</td><td class="r num">10%</td></tr><tr><td>Label</td><td class="r num">1</td><td class="r num">2%</td></tr><tr><td>Carton</td><td class="r num">1 per 12 pairs</td><td class="r num">2%</td></tr></tbody></table></div></div>' +
+      '<div class="card"><div class="sect">Please confirm</div><p class="muted" style="margin-top:4px">I assumed these. A wrong assumption changes every plan.</p><ul class="qs">' + confirms + "</ul></div></div></div>";
+  }
+
+  /* ---------- ORDERS ---------- */
+  function viewOrders() {
+    var res = computeAll(flags());
+    var h = '<div class="stack-v"><div><h2>Orders</h2><p class="muted">Open an order and the agent reads it, checks the machines and the workload, and builds a feasibility plan.</p></div>';
+    ORDERS.forEach(function (o) {
+      var r = res[o.id], v = verdict(r, o), isNew = o.status === "New request" && !state.booked[o.id];
+      h += '<button class="row-link" data-act="open-order" data-id="' + o.id + '"><div><div class="row"><h3>' + o.id + " · " + o.cust + '</h3><span class="chip ' + (isNew ? "acc" : "idle") + '">' + (state.booked[o.id] ? "Booked" : o.status) + '</span></div><span class="muted">' + o.item + " · " + f0(o.pairs) + " pairs · ship by " + fmt(o.shipBy) + '</span></div><div class="row"><span class="chip ' + v.c + '">' + v.t + '</span><span class="btn small ' + (isNew ? "primary" : "") + '">' + (isNew ? "Check feasibility" : "Open") + "</span></div></button>";
+    });
+    return h + "</div>";
+  }
+
+  function chartHtml(oid, res, fl) {
+    var x0 = D(7,1), x1 = D(8,8), days = x1 - x0 + 1, lw = 150, dw = 16, rh = 58, top = 46, W = lw + days * dw + 10, H = top + STEPS.length * rh + 18;
+    var s = '<svg class="chart" viewBox="0 0 ' + W + " " + H + '" role="img" aria-label="Machine workload by day for each step" style="width:100%;min-width:760px;height:auto">';
+    for (var i = 0; i < days; i += 7) { var gx = lw + i * dw; s += '<line class="grid" x1="' + gx + '" y1="' + (top - 4) + '" x2="' + gx + '" y2="' + (H - 18) + '"/><text class="tick" x="' + (gx + 2) + '" y="' + (top - 8) + '">' + fmt(x0 + i) + "</text>"; }
+    STEPS.forEach(function (st, ri) {
+      var y0 = top + ri * rh, base = y0 + rh - 14, hmax = rh - 26, maxCap = 1, d, i2;
+      for (d = x0; d <= x1; d++) maxCap = Math.max(maxCap, cap(st.id, d, fl));
+      s += '<text class="rowlab" x="0" y="' + (y0 + 18) + '">' + st.name + '</text><text class="rowsub" x="0" y="' + (y0 + 32) + '">up to ' + f0(maxCap) + " a day</text>";
+      var shaded = false, path = "", dn = "";
+      for (d = x0; d <= x1; d++) {
+        i2 = d - x0; var x = lw + i2 * dw, c = cap(st.id, d, fl);
+        if (c < capNominal(st.id, fl)) { s += '<rect class="down" x="' + x + '" y="' + (y0 + 2) + '" width="' + dw + '" height="' + (rh - 14) + '"><title>' + fmt(d) + ": " + f0(c) + " a day (maintenance)</title></rect>"; if (!shaded) { dn = '<text class="dnlab" x="' + (x + 2) + '" y="' + (y0 + 9) + '">maintenance</text>'; shaded = true; } }
+        var other = 0, mine = 0;
+        for (var k in res) { if (k.charAt(0) === "_") continue; var u = res[k].steps[st.id].usage[d] || 0; if (k === oid) mine = u; else other += u; }
+        var ho = other / maxCap * hmax, hm = mine / maxCap * hmax;
+        if (ho > 0) s += '<rect class="bar-other" x="' + (x + 1) + '" y="' + (base - ho) + '" width="' + (dw - 3) + '" height="' + ho + '"><title>' + fmt(d) + ": other orders " + f0(other) + " pairs</title></rect>";
+        if (hm > 0) s += '<rect class="bar-this" x="' + (x + 1) + '" y="' + (base - ho - hm) + '" width="' + (dw - 3) + '" height="' + hm + '"><title>' + fmt(d) + ": " + oid + " " + f0(mine) + " pairs</title></rect>";
+        var cy = base - c / maxCap * hmax; path += (i2 ? " V" : "M") + (i2 ? cy : x + " " + cy) + " H" + (x + dw);
+        if (!i2) path = "M" + x + " " + cy + " H" + (x + dw);
+      }
+      s += '<path class="capline" d="' + path + '"/>' + dn;
+    });
+    var o = byId(oid), r = res[oid], v = verdict(r, o);
+    var clampX = function (day) { return lw + Math.max(0, Math.min(days - 1, day - x0)) * dw + dw / 2; };
+    var sx = clampX(o.shipBy), rx = clampX(r.ready);
+    s += '<line class="ship" x1="' + sx + '" y1="14" x2="' + sx + '" y2="' + (H - 18) + '"/><text class="shiplab" x="' + sx + '" y="11" text-anchor="' + (sx > rx ? "start" : "end") + '">Ship by ' + fmt(o.shipBy) + "</text>";
+    s += '<line class="ready ' + v.c + '" x1="' + rx + '" y1="30" x2="' + rx + '" y2="' + (H - 18) + '"/><text class="readylab ' + v.c + '" x="' + rx + '" y="27" text-anchor="' + (rx >= sx ? "start" : "end") + '">Ready ' + fmt(r.ready) + "</text></svg>";
+    return s;
+  }
+
+  function materialsRows(o, r) {
+    var items = [
+      { n:"Cotton yarn", need:o.pairs * o.g / 1000 * 1.10, u:"kg", hand:o.hand.yarn, moq:500, v:"Ravi Spinning", arr:o.yarnArr },
+      { n:"Elastane", need:o.pairs * o.el / 1000 * 1.10, u:"kg", hand:o.hand.el, moq:50, v:"Chennai trader", arr:o.yarnArr - 4 },
+      { n:"Labels", need:o.pairs * 1.02, u:"pcs", hand:o.hand.label, moq:5000, v:"Sri Print", arr:o.shipBy - 10 },
+      { n:"Cartons", need:o.pairs / o.perCarton * 1.02, u:"pcs", hand:o.hand.carton, moq:250, v:"Sri Print", arr:o.shipBy - 10 }
+    ];
+    return items.map(function (i) {
+      var need = Math.ceil(i.need), ord = Math.ceil(Math.max(need - i.hand, 0) / i.moq) * i.moq;
+      return "<tr><td><b>" + i.n + '</b></td><td class="r num">' + f0(need) + " " + i.u + '</td><td class="r num">' + f0(i.hand) + '</td><td class="r num"><b>' + f0(ord) + " " + i.u + "</b></td><td>" + i.v + '</td><td class="num">' + fmt(i.arr) + "</td></tr>";
+    }).join("");
+  }
+
+  function risksFor(o, r, res, fl) {
+    var out = [], slotSlack = r.dye.start - (o.yarnArr + 1), nextSlot = null, i;
+    for (i = 0; i < SLOTS.length; i++) if (SLOTS[i] > r.dye.start) { nextSlot = SLOTS[i]; break; }
+    if (r.slack >= 0 && r.slack <= 1) out.push("Almost no buffer. One day of slip anywhere moves the ship date.");
+    if (slotSlack < 6) out.push("Yarn is due " + fmt(o.yarnArr) + ", " + plural(slotSlack) + " before the " + fmt(r.dye.start) + " dye batch. Ravi usually runs about 6 days late, which would miss the batch" + (nextSlot ? " and push dyeing to " + fmt(nextSlot) : "") + ".");
+    DOWN0.forEach(function (x) { if (r.steps[x.step].start <= x.to && r.steps[x.step].finish >= x.from) out.push("Knitting loses " + x.n + " machines from " + fmt(x.from) + " to " + fmt(x.to) + " (" + x.why + "), so capacity drops from " + f0(capNominal("knit", fl)) + " to " + f0(cap("knit", x.from, fl)) + " pairs a day.");});
+    Object.keys(res).forEach(function (k) {
+      if (k.charAt(0) === "_" || k === o.id) return;
+      var a = [], d; for (d in r.steps.knit.usage) if (res[k].steps.knit.usage[d]) a.push(+d);
+      if (a.length) { a.sort(function (x, y) { return x - y; }); out.push("Shares knitting with " + k + " on " + fmt(a[0]) + (a.length > 1 ? " to " + fmt(a[a.length - 1]) : "") + "."); }
+    });
+    var bn = bottleneck(fl); if (bn.id !== "knit") out.push("With the second shift, " + bn.name.toLowerCase() + " becomes the limit at " + f0(bn.c) + " pairs a day, so knitting alone cannot go faster.");
+    return out;
+  }
+
+  function optionCards(o, res, fl) {
+    var cur = res[o.id], cards = [];
+    var variants = [
+      { key:"second", label:"Add a second shift on knitting", set:{ second:true, prio:state.prio }, apply:"second" },
+      { key:"prio", label:"Run this order ahead of SO-1190", set:{ second:state.second, prio:true }, apply:"prio", only:o.id === "SO-1195" },
+      { key:"both", label:"Both", set:{ second:true, prio:true }, apply:"both", only:o.id === "SO-1195" }
+    ];
+    var recKey = null, recDays = 1e9;
+    variants.forEach(function (v) { if (v.only === false) return; var r2 = computeAll(flags(v.set)); v.r2 = r2; v.me = r2[o.id]; if (v.me.slack >= 2 && v.me.ready < recDays && cur.slack < 2) { recKey = v.key; recDays = v.me.ready; } });
+    variants.forEach(function (v) {
+      if (v.only === false) return;
+      var me = v.me, vv = verdict(me, o), others = [];
+      Object.keys(v.r2).forEach(function (k) { if (k.charAt(0) === "_" || k === o.id) return; if (v.r2[k].ready !== res[k].ready) others.push(k + " ready " + fmt(v.r2[k].ready) + " (was " + fmt(res[k].ready) + "), " + plural(v.r2[k].slack) + " of buffer"); });
+      var on = v.key === "second" ? state.second : v.key === "prio" ? state.prio : (state.second && state.prio);
+      cards.push('<div class="opt' + (v.key === recKey ? " rec" : "") + '">' + (v.key === recKey ? '<span class="chip acc" style="align-self:flex-start">Recommended</span>' : "") + "<b>" + v.label + '</b><span class="big num">Ready ' + fmt(me.ready) + '</span><span class="chip ' + vv.c + '" style="align-self:flex-start">' + (me.slack >= 0 ? plural(me.slack) + " to spare" : plural(-me.slack) + " late") + "</span>" +
+        '<span class="muted">' + (others.length ? others.join(". ") + "." : "No other order moves.") + (v.key !== "prio" ? " Extra labour cost is not included." : "") + '</span><div class="actions"><button class="btn small ' + (on ? "" : "primary") + '" data-act="opt" data-a="' + v.apply + '">' + (on ? "Undo" : "Apply this") + "</button></div></div>");
+    });
+    return cards.join("");
+  }
+
+  function replyDraft(o, r, fl) {
+    var v = verdict(r, o), cond = [];
+    if (state.second) cond.push("an extra knitting shift"); if (state.prio && o.id === "SO-1195") cond.push("scheduling ahead of another order");
+    if (r.slack >= 0) return "Thank you for the request. We can ship " + f0(o.pairs) + " pairs by " + fmt(r.ready) + ", ahead of your " + fmt(o.shipBy) + " date" + (cond.length ? ", with " + cond.join(" and ") : "") + ". Please confirm the " + "colours and we will book the slot.";
+    return "Thank you for the request. With our current commitments the earliest we can ship " + f0(o.pairs) + " pairs is " + fmt(r.ready) + ", " + plural(-r.slack) + " after your " + fmt(o.shipBy) + " date. We can offer an earlier date if we add capacity. Would a split shipment work for you?";
+  }
+
+  function viewOrder() {
+    var o = byId(state.order), fl = flags(), res = computeAll(fl), r = res[o.id], v = verdict(r, o);
+    var stage = state.analyzed[o.id] ? 3 : state.stage;
+    var steps = ["Reading the order", "Checking machines and workload", "Building the feasibility plan"];
+    var h = '<div class="crumbs"><button data-act="go" data-v="orders">Orders</button><span>/</span><span>' + o.id + '</span></div><div class="stack-v">';
+    h += '<div class="card"><div class="row"><h2>' + o.id + " · " + o.cust + '</h2><span class="chip ' + (o.status === "New request" && !state.booked[o.id] ? "acc" : "idle") + '">' + (state.booked[o.id] ? "Booked" : o.status) + '</span></div><p class="muted">' + o.item + " · " + f0(o.pairs) + " pairs · ship by " + fmt(o.shipBy) + "</p>" +
+      '<div class="progress" style="margin-top:10px">' + steps.map(function (t, i) { var st = i < stage ? "ok" : i === stage ? "acc pulse" : "idle"; return '<span class="chip ' + st + '">' + (i < stage ? "Done: " : "") + t + "</span>"; }).join("") + "</div></div>";
+    if (stage >= 1) {
+      h += '<div class="card"><div class="sect"><span class="step">1</span>What I understood</div><div class="grid2" style="margin-top:10px"><div><p class="muted" style="margin-bottom:6px">' + o.src + '</p><p class="quote">' + esc(o.text) + '</p></div><div class="fields" style="margin-top:0">' +
+        o.fields.map(function (f) { return "<div><small>" + f[0] + '</small><b>' + f[1] + '</b> <span class="chip ' + (f[3] ? "warn" : "ok") + '">' + (f[3] ? "Check, " : "") + f[2] + "</span></div>"; }).join("") + "</div></div></div>";
+    }
+    if (stage >= 2) {
+      var from = r.steps.knit.start, to = r.steps.pack.finish;
+      var rows = STEPS.map(function (s) { var u = utilOf(s.id, from, to, res, fl); return { s:s, u:u }; }), hot = rows.reduce(function (a, b) { return b.u > a.u ? b : a; });
+      h += '<div class="card"><div class="sect"><span class="step">2</span>Machines and workload</div><p class="muted" style="margin:4px 0 8px">Bars show pairs per day. Dark bars are this order, grey bars are the other orders, the dashed line is capacity.</p><div class="chartwrap">' + chartHtml(o.id, res, fl) + '</div><div class="legend"><span><i style="background:var(--accent)"></i>' + o.id + '</span><span><i style="background:var(--other)"></i>Other orders</span><span><i style="background:var(--warn-bg)"></i>Machines down</span></div>' +
+        '<div class="tablewrap" style="margin-top:10px"><table><thead><tr><th>Step</th><th class="r">Capacity a day</th><th>Busy while this order runs</th></tr></thead><tbody>' +
+        rows.map(function (x) { return "<tr><td><b>" + x.s.name + '</b></td><td class="r num">' + f0(capNominal(x.s.id, fl)) + '</td><td><div class="row"><div class="ubar' + (x === hot ? " hot" : "") + '" style="flex:1"><span style="width:' + Math.min(100, Math.round(x.u * 100)) + '%"></span></div><span class="num">' + Math.round(x.u * 100) + "%</span>" + (x === hot ? '<span class="chip warn">Busiest</span>' : "") + "</div></td></tr>"; }).join("") + "</tbody></table></div></div>";
+    }
+    if (stage >= 3) {
+      var isNew = o.status === "New request";
+      h += '<div class="card"><div class="sect"><span class="step">3</span>Feasibility plan</div><div class="verdict ' + v.c + '" style="margin-top:10px"><div class="row"><span class="chip ' + v.c + '">' + v.t + '</span><b>' + v.d + "</b></div></div>" +
+        '<div class="stats" style="margin-top:10px"><div class="card stat"><small>Ready to ship</small><strong class="num">' + fmt(r.ready) + '</strong><span class="sub">Deadline ' + fmt(o.shipBy) + '</span></div><div class="card stat"><small>Buffer</small><strong class="num">' + (r.slack >= 0 ? plural(r.slack) : plural(-r.slack) + " late") + '</strong><span class="sub">Deadline minus ready date</span></div><div class="card stat"><small>Knitting window</small><strong class="num">' + fmt(r.steps.knit.start) + " to " + fmt(r.steps.knit.finish) + '</strong><span class="sub">' + plural(r.steps.knit.days) + "</span></div></div>" +
+        '<h3 style="margin:14px 0 6px">Schedule</h3><div class="tablewrap"><table><thead><tr><th>Step</th><th>Start</th><th>Finish</th><th>Days</th></tr></thead><tbody><tr><td><b>Yarn dyeing</b> (outside)</td><td class="num">' + fmt(r.dye.start) + '</td><td class="num">' + fmt(r.dye.finish) + '</td><td class="num">5</td></tr>' +
+        STEPS.map(function (s) { var x = r.steps[s.id]; return "<tr><td><b>" + s.name + '</b></td><td class="num">' + fmt(x.start) + '</td><td class="num">' + fmt(x.finish) + '</td><td class="num">' + x.days + "</td></tr>"; }).join("") +
+        '<tr><td><b>Dispatch</b></td><td class="num">' + fmt(r.steps.pack.finish + 1) + '</td><td class="num">' + fmt(r.ready) + '</td><td class="num">2</td></tr></tbody></table></div>' +
+        '<h3 style="margin:14px 0 6px">Materials</h3><div class="tablewrap"><table><thead><tr><th>Item</th><th class="r">Needed</th><th class="r">On hand</th><th class="r">Buy</th><th>Vendor</th><th>Expected</th></tr></thead><tbody>' + materialsRows(o, r) + "</tbody></table></div>" +
+        '<h3 style="margin:14px 0 0">What could go wrong</h3><ul class="risks">' + risksFor(o, r, res, fl).map(function (t) { return "<li>" + t + "</li>"; }).join("") + "</ul>" +
+        '<h3 style="margin:14px 0 6px">Options</h3><div class="opts">' + optionCards(o, res, fl) + "</div>" +
+        (isNew ? '<h3 style="margin:14px 0 6px">Draft reply to the customer</h3><div class="opt"><span style="font-style:italic">' + esc(replyDraft(o, r, fl)) + '</span><div class="actions"><button class="btn small" data-act="toast" data-m="In the real app you can edit the reply here.">Edit</button><button class="btn small" data-act="toast" data-m="Sample only. Nothing was sent.">Approve and send</button></div></div>' : "") +
+        '<div class="actions"><button class="btn primary" data-act="book" data-id="' + o.id + '"' + (o.status !== "New request" || state.booked[o.id] ? " disabled" : "") + ">" + (o.status !== "New request" ? "Already booked" : state.booked[o.id] ? "Booked (sample)" : "Accept and book this plan") + '</button><button class="btn" data-act="gpt-order" data-id="' + o.id + '">Ask Production GPT about this order</button></div></div>';
+    }
+    return h + "</div>";
+  }
+
+  /* ---------- PRODUCTION GPT ---------- */
+  function insightsHtml() {
+    var fl = flags(), res = computeAll(fl), bn = bottleneck(fl);
+    var tight = ORDERS.map(function (o) { return { o:o, r:res[o.id] }; }).sort(function (a, b) { return a.r.slack - b.r.slack; })[0];
+    var u = utilOf("knit", D(7,1), D(7,31), res, fl);
+    var rows = [
+      ["Bottleneck", bn.name + ", " + f0(bn.c) + " a day", "Every other step can keep up with it."],
+      ["Tightest order", tight.o.id + ", " + (tight.r.slack >= 0 ? plural(tight.r.slack) + " of buffer" : plural(-tight.r.slack) + " late"), "Ready " + fmt(tight.r.ready) + " against " + fmt(tight.o.shipBy) + "."],
+      ["Knitting in July", Math.round(u * 100) + "% booked", "Maintenance Jul 15 to 25 takes 2 machines out."],
+      ["New request", verdict(res["SO-1195"], byId("SO-1195")).t, "SO-1195, ready " + fmt(res["SO-1195"].ready) + "."]
+    ];
+    return rows.map(function (r) { return '<div class="insight"><small>' + r[0] + "</small><b>" + r[1] + '</b><span class="muted">' + r[2] + "</span></div>"; }).join("");
+  }
+  function orderAnswer(id) {
+    var o = byId(id), fl = flags(), res = computeAll(fl), r = res[id], v = verdict(r, o), risks = risksFor(o, r, res, fl);
+    var calc = ["Ready date = packing finish (" + fmt(r.steps.pack.finish) + ") + 2 days dispatch = " + fmt(r.ready), "Buffer = deadline (" + fmt(o.shipBy) + ") minus ready (" + fmt(r.ready) + ") = " + r.slack + " days", "Knitting " + fmt(r.steps.knit.start) + " to " + fmt(r.steps.knit.finish) + " at up to " + f0(capNominal("knit", fl)) + " pairs a day"];
+    var opt = ""; if (id === "SO-1195" && r.slack < 2) { var a = computeAll(flags({ second:true, prio:true }))[id]; opt = " Neither a second shift nor running ahead of SO-1190 is enough alone. Both together make it: ready " + fmt(a.ready) + ", " + plural(a.slack) + " to spare."; }
+    return { html:"<b>" + id + ": " + v.t + ".</b> " + v.d + opt + "<ul>" + risks.slice(0, 3).map(function (t) { return "<li>" + t + "</li>"; }).join("") + "</ul>", calc:calc };
+  }
+  function gptAnswer(q) {
+    var s = q.toLowerCase(), fl = flags(), res = computeAll(fl), m = s.match(/(?:so-?)?(1182|1190|1195)/);
+    if (m) return orderAnswer("SO-" + m[1]);
+    if (/break|breakdown|fail|goes down|go down/.test(s)) {
+      var rx = computeAll(flags({ down:DOWN0.concat([{ step:"knit", from:D(7,3), to:D(7,10), n:2, why:"breakdown" }]) })), lines = [], calc = [];
+      ORDERS.forEach(function (o) { var a = res[o.id], b = rx[o.id]; if (a.ready !== b.ready) lines.push("<li>" + o.id + " ready " + fmt(b.ready) + " instead of " + fmt(a.ready) + " (" + (b.slack >= 0 ? plural(b.slack) + " of buffer" : plural(-b.slack) + " late") + ")</li>"); calc.push(o.id + ": ready " + fmt(a.ready) + " to " + fmt(b.ready)); });
+      return { html:"If 2 knitting machines break down from Jul 3 to Jul 10, knitting falls from " + f0(capNominal("knit", fl)) + " to " + f0(cap("knit", D(7,5), { second:state.second, down:[{ step:"knit", from:D(7,3), to:D(7,10), n:2 }] })) + " pairs a day for 8 days." + (lines.length ? "<ul>" + lines.join("") + "</ul>" : " No ship date changes.") + "A day-by-day plan with the knitters on overtime would be the first fix to test.", calc:calc };
+    }
+    if (/second shift|extra shift|overtime|add a shift/.test(s)) {
+      var r2 = computeAll(flags({ second:true })), rb = computeAll(flags({ second:false })), ls = [], c2 = [];
+      ORDERS.forEach(function (o) { ls.push("<li>" + o.id + ": ready " + fmt(r2[o.id].ready) + " (" + fmt(rb[o.id].ready) + " without), " + (r2[o.id].slack >= 0 ? plural(r2[o.id].slack) + " of buffer" : plural(-r2[o.id].slack) + " late") + "</li>"); c2.push("Knitting " + f0(capNominal("knit", { second:false })) + " x 1.5 = " + f0(capNominal("knit", { second:true })) + " pairs a day"); });
+      return { html:"A second shift on knitting lifts knitting to " + f0(capNominal("knit", { second:true })) + " a day, but toe closing then limits the line at " + f0(capNominal("link", fl)) + ". Effect:<ul>" + ls.join("") + "</ul>Extra labour cost is not included.", calc:[c2[0], "Toe closing " + proc.link.n + " x " + proc.link.rate + " = " + f0(capNominal("link", fl)) + " pairs a day (new limit)"] };
+    }
+    if (/bottleneck|slowest|limit/.test(s) || /per day|a day|how much can|how many|capacity/.test(s)) {
+      var bn = bottleneck(fl), l = STEPS.map(function (st) { return "<li>" + st.name + ": " + proc[st.id].n + " " + st.unit + " x " + f0(proc[st.id].rate) + " = " + f0(capNominal(st.id, fl)) + "</li>"; }).join("");
+      return { html:"The plant can finish about <b>" + f0(bn.c) + " pairs a day</b>. " + bn.name + " is the limit. During maintenance (Jul 15 to 25) knitting drops to " + f0(cap("knit", D(7,20), fl)) + " a day. With a second shift it would be " + f0(capNominal("knit", { second:true })) + ", and toe closing (" + f0(capNominal("link", fl)) + ") becomes the limit.", calc:STEPS.map(function (st) { return st.name + ": " + proc[st.id].n + " x " + proc[st.id].rate + " = " + f0(capNominal(st.id, fl)); }) };
+    }
+    if (/busy|util|load|workload|booked/.test(s)) {
+      var rows = STEPS.map(function (st) { var u = utilOf(st.id, D(7,1), D(7,31), res, fl); return { st:st, u:u }; });
+      return { html:"Share of July capacity already booked:<ul>" + rows.map(function (x) { return "<li>" + x.st.name + ": " + Math.round(x.u * 100) + "%</li>"; }).join("") + "</ul>Knitting is the busiest, so new work competes for it first.", calc:["Booked pairs in Jul 1 to Jul 31 divided by capacity in the same days, per step", "Includes maintenance days at reduced capacity"] };
+    }
+    if (/risk|late|tight|buffer|slack|worry/.test(s)) {
+      var sorted = ORDERS.map(function (o) { return { o:o, r:res[o.id] }; }).sort(function (a, b) { return a.r.slack - b.r.slack; });
+      return { html:"Order by risk:<ul>" + sorted.map(function (x) { return "<li><b>" + x.o.id + "</b>: " + (x.r.slack >= 0 ? plural(x.r.slack) + " of buffer" : plural(-x.r.slack) + " late") + ", ready " + fmt(x.r.ready) + " against " + fmt(x.o.shipBy) + "</li>"; }).join("") + "</ul>The yarn from Ravi is the main outside risk: he usually runs about 6 days late.", calc:sorted.map(function (x) { return x.o.id + ": " + x.r.slack + " days = deadline minus ready"; }) };
+    }
+    if (/free|available|spare|when can|gap/.test(s)) {
+      var last = 0, gaps = [], d; for (d = D(7,1); d <= D(8,31); d++) { var used = 0; for (var k in res) { if (k.charAt(0) !== "_") used += res[k].steps.knit.usage[d] || 0; } if (used > 0) last = d; var free = cap("knit", d, fl) - used; if (used > 0 && free >= 1000) gaps.push(fmt(d) + " (" + f0(free) + " pairs)"); }
+      return { html:"Knitting is booked through " + fmt(last) + ". After that the full " + f0(capNominal("knit", fl)) + " pairs a day is free." + (gaps.length ? " Small gaps before then: " + gaps.slice(0, 3).join(", ") + "." : ""), calc:["Free = capacity minus booked pairs, day by day"] };
+    }
+    return { plain:true, html:"I can answer questions about capacity, bottlenecks, how busy the machines are, which order is at risk, a specific order such as SO-1195, and what-ifs like a second shift or a machine breakdown. Try one of the suggestions below.", calc:[] };
+  }
+  function ctxNote() { var p = []; if (state.second) p.push("a second shift on knitting"); if (state.prio) p.push("SO-1195 scheduled ahead of SO-1190"); if (!p.length) return ""; return '<p class="muted" style="margin-top:8px">Using your current plan: ' + p.join(" and ") + '. <button type="button" class="btn small" data-act="reset-flags">Use the base plan</button></p>'; }
+  function viewGpt() {
+    var h = '<div class="stack-v"><div><h2>Production GPT</h2><p class="muted">Ask anything about production. Answers come from your process, your machines and your orders, and show their working.</p></div>' +
+      (ctxNote() || '<p class="muted">Using the base plan: no extra shift, orders in due-date order.</p>') + '<div class="insights">' + insightsHtml() + "</div>" +
+      '<div class="card"><div class="chat" id="chat" aria-live="polite">' + gptMsgs() + '</div><div class="chips">' +
+      ["How much can I make in a day?","Which order is most at risk?","Can I accept SO-1195?","What if I add a second shift?","What if 2 knitting machines break down Jul 3 to 10?","How busy are the machines in July?","When is knitting free?"].map(function (q) { return '<button type="button" class="btn small" data-act="ask" data-q="' + q + '">' + q + "</button>"; }).join("") +
+      '</div><form class="ask" id="askform"><label for="q" style="position:absolute;left:-9999px">Ask Production GPT</label><input id="q" type="text" placeholder="Ask about capacity, orders or what-ifs" autocomplete="off"><button class="btn primary" type="submit">Ask</button></form></div></div>';
+    return h;
+  }
+  function gptMsgs() {
+    return state.gpt.map(function (m) {
+      if (m.role === "user") return '<div class="msg user">' + esc(m.html) + "</div>";
+      return '<div class="msg">' + m.html + (m.calc && m.calc.length ? "<details><summary>Show the calculation</summary><ul>" + m.calc.map(function (c) { return "<li>" + c + "</li>"; }).join("") + "</ul></details>" : "") + "</div>";
+    }).join("");
+  }
+  function gptAsk(q) {
+    var a = gptAnswer(q); state.gpt.push({ role:"user", html:q }); state.gpt.push({ role:"gpt", html:a.html + (a.plain ? "" : ctxNote()), calc:a.calc });
+    var ch = $("#chat"); if (ch) { ch.innerHTML = gptMsgs(); ch.scrollTop = ch.scrollHeight; }
+  }
+
+  /* ---------- render and events ---------- */
+  var TITLES = { process:"Process", orders:"Orders", order:"Order", gpt:"Production GPT" };
+  var timers = [];
+  function render() {
+    $("#title").textContent = state.view === "order" ? state.order : TITLES[state.view];
+    $("#nav-side").innerHTML = navHtml(); $("#nav-bottom").innerHTML = navHtml();
+    var fn = { process:viewProcess, orders:viewOrders, order:viewOrder, gpt:viewGpt }[state.view];
+    var main = $("#main"), top = main.scrollTop; main.innerHTML = fn(); main.scrollTop = top;
+    if (state.view === "gpt") { var ch = $("#chat"); if (ch) ch.scrollTop = ch.scrollHeight; }
+  }
+  function go(v, id) {
+    timers.forEach(clearTimeout); timers = [];
+    state.view = v;
+    if (v === "order") {
+      state.order = id;
+      if (!state.analyzed[id]) {
+        state.stage = 0; render();
+        timers.push(setTimeout(function () { state.stage = 1; render(); }, 450));
+        timers.push(setTimeout(function () { state.stage = 2; render(); }, 1000));
+        timers.push(setTimeout(function () { state.stage = 3; state.analyzed[id] = true; render(); }, 1550));
+        try { history.replaceState(null, "", "#order-" + id.slice(3)); } catch (e) {}
+        window.scrollTo(0, 0); $("#main").scrollTop = 0; return;
+      }
+      try { history.replaceState(null, "", "#order-" + id.slice(3)); } catch (e) {}
+    } else { try { history.replaceState(null, "", "#" + v); } catch (e) {} }
+    render(); $("#main").scrollTop = 0; window.scrollTo(0, 0);
+  }
+  function toast(m) { var t = $("#toast"); t.textContent = m; t.hidden = false; clearTimeout(toast.h); toast.h = setTimeout(function () { t.hidden = true; }, 2600); }
+
+  document.addEventListener("click", function (e) {
+    var t = e.target.closest("[data-act]"); if (!t || t.disabled) return;
+    var a = t.getAttribute("data-act");
+    if (a === "go") go(t.getAttribute("data-v"));
+    else if (a === "open-order") go("order", t.getAttribute("data-id"));
+    else if (a === "flag") { state[t.getAttribute("data-k")] = t.checked; render(); }
+    else if (a === "opt") { var k = t.getAttribute("data-a"); if (k === "second") state.second = !state.second; else if (k === "prio") state.prio = !state.prio; else { var both = state.second && state.prio; state.second = !both; state.prio = !both; } render(); }
+    else if (a === "book") { state.booked[t.getAttribute("data-id")] = true; render(); toast("Booked (sample). Nothing was sent."); }
+    else if (a === "confirm") { state.confirmed[t.getAttribute("data-k")] = true; render(); }
+    else if (a === "redesign") { state.reading = true; render(); setTimeout(function () { state.reading = false; render(); toast("Plan updated: 7 steps, 3 questions to confirm"); }, 1400); }
+    else if (a === "ask") { gptAsk(t.getAttribute("data-q")); }
+    else if (a === "gpt-order") { state.view = "gpt"; render(); var id = t.getAttribute("data-id"); gptAsk(id === "SO-1195" ? "Can I accept SO-1195?" : "How tight is " + id + "?"); window.scrollTo(0, 0); try { history.replaceState(null, "", "#gpt"); } catch (e2) {} }
+    else if (a === "reset-flags") { state.second = false; state.prio = false; render(); }
+    else if (a === "toast") toast(t.getAttribute("data-m"));
+  });
+  document.addEventListener("change", function (e) {
+    var el = e.target;
+    if (el.hasAttribute && el.hasAttribute("data-proc")) { var v = Math.max(1, Math.round(+el.value || 1)); proc[el.getAttribute("data-proc")][el.getAttribute("data-field")] = v; render(); toast("Plan updated with the new number"); }
+    else if (el.getAttribute && el.getAttribute("data-act") === "flag") { state[el.getAttribute("data-k")] = el.checked; render(); }
+  });
+  document.addEventListener("submit", function (e) { if (e.target.id === "askform") { e.preventDefault(); var i = $("#q"); if (i.value.trim()) { gptAsk(i.value.trim()); i.value = ""; } } });
+
+  function fromHash() {
+    var h = location.hash.replace("#", "");
+    if (/^order-\d{4}$/.test(h) && byId("SO-" + h.slice(6))) { state.view = "order"; state.order = "SO-" + h.slice(6); state.analyzed[state.order] = true; }
+    else if (TITLES[h] && h !== "order") state.view = h;
+  }
+  window.addEventListener("hashchange", function () { fromHash(); render(); });
+  state.gpt.push({ role:"gpt", html:"Hello Meena. I know your process, your machines and your three orders. Ask me about capacity, which order is at risk, whether to accept SO-1195, or what happens if a machine goes down.", calc:[] });
+  fromHash(); render();
+})();
+</script>

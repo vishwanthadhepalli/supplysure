@@ -1,0 +1,13 @@
+{
+  "orders": [
+    {"id": "SO-1182", "buyer": "Gulf buyer", "pairs": 50000, "ship_by": "2027-07-20", "status": "booked", "grams_per_pair": 90, "yarn_arrival": "2027-06-25"},
+    {"id": "SO-1190", "buyer": "EU retailer", "pairs": 20000, "ship_by": "2027-08-12", "status": "booked", "grams_per_pair": 60, "yarn_arrival": "2027-07-03"},
+    {"id": "SO-1195", "buyer": "New request", "pairs": 30000, "ship_by": "2027-07-28", "status": "tentative", "grams_per_pair": 90, "yarn_arrival": "2027-07-05"}
+  ],
+  "materials_SO-1182": [
+    {"item": "cotton_yarn_kg", "need": 4950, "on_hand": 1200, "moq": 500, "supplier": "sup-ravi"},
+    {"item": "elastane_kg", "need": 165, "on_hand": 40, "moq": 50, "supplier": "sup-ravi"},
+    {"item": "labels_pcs", "need": 51000, "on_hand": 8000, "moq": 5000, "supplier": "sup-sriprint"},
+    {"item": "cartons_pcs", "need": 4250, "on_hand": 500, "moq": 250, "supplier": "sup-chennai"}
+  ]
+}

@@ -1,0 +1,1 @@
+"""SupplySure application package."""
